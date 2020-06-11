@@ -43,10 +43,10 @@ public class Worker extends AbstractLoggingActor {
 	/////////////////////
 
 	@Override
-	public void preStart() {
+	public void preStart() { //
 		Reaper.watchWithDefaultReaper(this);
 		
-		this.cluster.subscribe(this.self(), MemberUp.class, MemberRemoved.class);
+		this.cluster.subscribe(this.self(), MemberUp.class, MemberRemoved.class); //here worker is subscribing
 	}
 
 	@Override

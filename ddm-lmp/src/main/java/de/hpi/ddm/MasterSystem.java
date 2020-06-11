@@ -37,7 +37,7 @@ public class MasterSystem {
 		
 		ActorRef master = system.actorOf(Master.props(), Master.DEFAULT_NAME);
 		
-		Cluster.get(system).registerOnMemberUp(new Runnable() {
+		Cluster.get(system).registerOnMemberUp(new Runnable() { // this is a runnable so it is working in the background always. this is the cluster. And creates a callback so workers register on member up
 			@Override
 			public void run() {
 				for (int i = 0; i < c.getNumWorkers(); i++)
@@ -45,7 +45,7 @@ public class MasterSystem {
 			}
 		});
 		
-		Cluster.get(system).registerOnMemberRemoved(new Runnable() {
+		Cluster.get(system).registerOnMemberRemoved(new Runnable() { // this is a runnable so it is working in the background always
 			@Override
 			public void run() {
 				system.terminate();

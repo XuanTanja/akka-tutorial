@@ -44,7 +44,7 @@ public class Master extends AbstractLoggingActor {
 
 	private final List<ActorRef> workers = new ArrayList<>();
 	private final ActorRef largeMessageProxy = this.context().actorOf(LargeMessageProxy.props(), LargeMessageProxy.DEFAULT_NAME);
-	private final BloomFilter data = new BloomFilter(BloomFilter.DEFAULT_SIZE, true);
+	private final BloomFilter data = new BloomFilter(BloomFilter.DEFAULT_SIZE, true); //Reminder if element is in or not
 	
 	private boolean isEnded = false;
 	
