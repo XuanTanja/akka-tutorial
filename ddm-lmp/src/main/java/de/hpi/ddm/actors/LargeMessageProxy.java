@@ -62,9 +62,9 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 				.build();
 	}
 
-	private void handle(LargeMessage<?> message) { // 7. Master sends a LargeMessage to the Worker which created a LargeMessageProxy under it
-		//TODO: I just dont understand why this is received by LargeMessageProxy if the address (sender) was a worker, not the worker's LargeMessageProxy
+	private void handle(LargeMessage<?> message) { // 7. Master sends (sender) a LargeMessage to the Worker (receiver) which created a LargeMessageProxy but the Worker is not receiving the message, but the LargeMessageProxy.     ??Apparently the worker has no more contact with the master?? But why!!>???
 		ActorRef receiver = message.getReceiver();
+
 		ActorSelection receiverProxy = this.context().actorSelection(receiver.path().child(DEFAULT_NAME));
 		
 		// This will definitely fail in a distributed setting if the serialized message is large!

@@ -34,6 +34,7 @@ public class Worker extends AbstractLoggingActor {
 
 	private Member masterSystem;
 	private final Cluster cluster = Cluster.get(this.context().system());
+
 	private final ActorRef largeMessageProxy = this.context().actorOf(LargeMessageProxy.props(), LargeMessageProxy.DEFAULT_NAME);
 	
 	private long registrationTime;
@@ -80,14 +81,16 @@ public class Worker extends AbstractLoggingActor {
 		this.register(message.member()); // 4. members who send memberUp message will also evoke register function (in case CurrentClusterState didnt get recieved)
 	}
 
-	private void register(Member member) { //If there is no masterSystem reference and the member has role MASTER_ROLE, then set this reference as this.masterSystem
-		if ((this.masterSystem == null) && member.hasRole(MasterSystem.MASTER_ROLE)) {
+	private void register(Member member) {
+		if ((this.masterSystem == null) && member.hasRole(MasterSystem.MASTER_ROLE)) { //If there is no masterSystem reference and the member has role MASTER_ROLE, then set this reference as this.masterSystem
 			this.masterSystem = member;
 			this.registrationTime = System.currentTimeMillis();
 			
 			this.getContext()
 				.actorSelection(member.address() + "/user/" + Master.DEFAULT_NAME)
 				.tell(new Master.RegistrationMessage(), this.self()); // 5. Here the worker communicates with the master for the first time, which is inside of masterSystem
+			System.out.println("WORKER IMPORTANT: " + this.self());
+			//Who can call the tell() function? Sender or reciever and why is the worker using master here with .tell()
 		}
 	}
 	
