@@ -46,7 +46,7 @@ public class Worker extends AbstractLoggingActor {
 	public void preStart() { //
 		Reaper.watchWithDefaultReaper(this);
 		
-		this.cluster.subscribe(this.self(), MemberUp.class, MemberRemoved.class); //here worker is subscribing
+		this.cluster.subscribe(this.self(), MemberUp.class, MemberRemoved.class); // 2. here worker is subscribing to change notifications of the cluster. This is the first message sent from worker to cluster on being created
 	}
 
 	@Override
@@ -69,25 +69,25 @@ public class Worker extends AbstractLoggingActor {
 				.build();
 	}
 
-	private void handle(CurrentClusterState message) {
-		message.getMembers().forEach(member -> {
-			if (member.status().equals(MemberStatus.up()))
-				this.register(member);
+	private void handle(CurrentClusterState message) { // 3. CurrentClusterState is sent as first message from cluster to subscriber after subscriber subscribed on preStart
+		message.getMembers().forEach(member -> { // Iterate through all members that the CurrentClusterState was sent to (so all cluster members)
+			if (member.status().equals(MemberStatus.up())) // If the status is up (so the node is responsive)
+				this.register(member); // 4. this register function is evoked
 		});
 	}
 
 	private void handle(MemberUp message) {
-		this.register(message.member());
+		this.register(message.member()); // 4. members who send memberUp message will also evoke register function (in case CurrentClusterState didnt get recieved)
 	}
 
-	private void register(Member member) {
+	private void register(Member member) { //If there is no masterSystem reference and the member has role MASTER_ROLE, then set this reference as this.masterSystem
 		if ((this.masterSystem == null) && member.hasRole(MasterSystem.MASTER_ROLE)) {
 			this.masterSystem = member;
 			this.registrationTime = System.currentTimeMillis();
 			
 			this.getContext()
 				.actorSelection(member.address() + "/user/" + Master.DEFAULT_NAME)
-				.tell(new Master.RegistrationMessage(), this.self());
+				.tell(new Master.RegistrationMessage(), this.self()); // 5. Here the worker communicates with the master for the first time, which is inside of masterSystem
 		}
 	}
 	

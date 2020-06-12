@@ -81,7 +81,7 @@ public class Master extends AbstractLoggingActor {
 			this.self().tell(PoisonPill.getInstance(), this.self());
 	}
 	
-	protected void handle(RegistrationMessage message) {
+	protected void handle(RegistrationMessage message) { // Workers that send RegistrationMessage are handled here
 		if (this.isEnded) {
 			this.sender().tell(PoisonPill.getInstance(), this.self());
 			return;
@@ -91,7 +91,7 @@ public class Master extends AbstractLoggingActor {
 		this.workers.add(this.sender());
 		this.log().info("Registered {}", this.sender());
 		
-		this.largeMessageProxy.tell(new LargeMessageProxy.LargeMessage<>(this.data, this.sender()), this.self());
+		this.largeMessageProxy.tell(new LargeMessageProxy.LargeMessage<>(this.data, this.sender()), this.self()); // 6. And responds by sending a LargeMessageProxy.LargeMessage to the sender (which is a worker)
 	}
 	
 	protected void handle(Terminated message) {

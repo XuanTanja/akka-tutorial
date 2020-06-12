@@ -62,7 +62,8 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 				.build();
 	}
 
-	private void handle(LargeMessage<?> message) {
+	private void handle(LargeMessage<?> message) { // 7. Master sends a LargeMessage to the Worker which created a LargeMessageProxy under it
+		//TODO: I just dont understand why this is received by LargeMessageProxy if the address (sender) was a worker, not the worker's LargeMessageProxy
 		ActorRef receiver = message.getReceiver();
 		ActorSelection receiverProxy = this.context().actorSelection(receiver.path().child(DEFAULT_NAME));
 		
