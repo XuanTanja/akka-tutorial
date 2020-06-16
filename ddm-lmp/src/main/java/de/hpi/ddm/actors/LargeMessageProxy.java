@@ -4,15 +4,24 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import akka.NotUsed;
 import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.Props;
 import akka.serialization.*;
+import akka.stream.ActorMaterializer;
+import akka.stream.Materializer;
+import akka.stream.javadsl.Sink;
+import akka.stream.javadsl.Source;
 import de.hpi.ddm.structures.KryoPoolSingleton;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import akka.japi.function.Creator;
+import java.util.Iterator;
+import java.util.stream.IntStream;
 
 public class LargeMessageProxy extends AbstractLoggingActor {
 
@@ -43,9 +52,10 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 		private T bytes;
 		private ActorRef sender;
 		private ActorRef receiver;
-		//private List<Byte> messageOutgoing = new ArrayList<Byte>();
-		//private byte[] messageIngoing = new byte[0];
 	}
+
+	private byte[] messageOutgoing; //Whole message that is going to be sent
+	//private byte[] messageIngoing = new byte[0];
 	
 	/////////////////
 	// Actor State //
@@ -58,7 +68,43 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 	////////////////////
 	// Actor Behavior //
 	////////////////////
-	
+
+
+	private class Creator2 implements Creator {
+
+		Iterator2 iterator = new Iterator2();
+
+		@Override
+		public Object create() throws Exception {
+			return iterator;
+		}
+	}
+
+	private class Iterator2 implements Iterator<Byte[]> {
+
+		private int i = 0;
+		//this is more or less arbitrary, but gives good results TODO: change this number and variable names??
+		private int size = 200000;
+
+		@Override
+		public boolean hasNext() {
+			return messageOutgoing.length > i * size;
+		}
+
+		@Override
+		public Byte[] next() {
+			int a = i * size; //chunk of data starting point
+			int o = a + size; //data chunk ending point
+			if (o > messageOutgoing.length) { //if
+				o = messageOutgoing.length;
+			}
+			i++;
+			return IntStream.range(a, o).mapToObj(k -> Byte.valueOf(messageOutgoing[k])).toArray(Byte[]::new);
+		}
+	}
+
+
+
 	@Override
 	public Receive createReceive() {
 		return receiveBuilder()
@@ -70,13 +116,39 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 
 	private void handle(LargeMessage<?> message) { // 7. Master sends (sender) a LargeMessage to the Worker (receiver) which created a LargeMessageProxy but the Worker is not receiving the message, but the LargeMessageProxy.     ??Apparently the worker has no more contact with the master?? But why!!>???
 		ActorRef receiver = message.getReceiver();
-
 		ActorSelection receiverProxy = this.context().actorSelection(receiver.path().child(DEFAULT_NAME));
 
-		// serializing with kryo https://github.com/twitter/chill
+		//Starting kryo serialization (create Source -> create sink -> materialize)
+		//https://doc.akka.io/docs/akka/2.5.22/stream/stream-quickstart.html
+		//https://github.com/twitter/chill
+		//https://en.wikibooks.org/wiki/Java_Akka_Streams/Sources
+		this.messageOutgoing = KryoPoolSingleton.get().toBytesWithClass(message.getMessage()); //converting data into bytes and saving to array
+
+		//Materializer from actor context
+		final Materializer materializer = ActorMaterializer.create(this.context());
+
+		Creator2 creator = new Creator2(); //TODO
+
+		//TODO pass creator to source and run it to generate the numbers from iterator
+
+		/*
+		Sink sink = Sink.actorRefWithAck(
+				message.getSender(),
+				new StreamInitializedMessage(),
+				Ack.INSTANCE,
+				new StreamCompletedMessage(),
+				err -> new StreamFailureMessage(err)
+		);
+		Source.fromIterator(creator).runWith(sink, ActorMaterializer.create(this.context()));
+		 */
+
+		//Create iterator to run and send message
+		//Source
+
+
 		//Like this : KryoPoolSingleton.get().toBytesWithClass(message.getMessage());
 
-		//https://doc.akka.io/docs/akka/2.5.22/stream/stream-quickstart.html
+
 
 		// This will definitely fail in a distributed setting if the serialized message is large!
 		// Solution options:
@@ -89,6 +161,9 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 
 	private void handle(BytesMessage<?> message) {
 		// Reassemble the message content, deserialize it and/or load the content from some local location before forwarding its content.
+
+		//Receive message from master ->   handle(LargeMessage<?> message)
+		//final Source<Byte, NotUsed> messageStream = source.scan(BigInteger.ONE, (acc, next) -> acc.multiply(BigInteger.valueOf(next)));
 
 		//Deserializelike this:
 		//Object deserObj = kryo.fromBytes(myObj);
