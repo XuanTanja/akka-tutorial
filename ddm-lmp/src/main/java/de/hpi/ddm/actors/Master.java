@@ -92,8 +92,8 @@ public class Master extends AbstractLoggingActor {
 		this.log().info("Registered {}", this.sender());
 
 		this.largeMessageProxy.tell(new LargeMessageProxy.LargeMessage<>(this.data, this.sender()), this.self()); // 6. And responds by sending a LargeMessageProxy.LargeMessage to the sender (which is a worker)
-		//Here the master (this.self()) is sending a message through the master/largeMessageProxy (this.largeMessageProxy) to the worker which is (this.sender())
-		System.out.println("IMPORTANT: " + this.largeMessageProxy+this.sender()+this.self());
+		//System.out.println("MASTER IMPORTANT* : " + this.largeMessageProxy+this.sender()+this.self());
+		//Here the master (this.self()) is sending a message to the master/largeMessageProxy (this.largeMessageProxy), which sends it then to the worker which is (this.sender())
 	}
 	
 	protected void handle(Terminated message) {

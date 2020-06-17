@@ -89,8 +89,7 @@ public class Worker extends AbstractLoggingActor {
 			this.getContext()
 				.actorSelection(member.address() + "/user/" + Master.DEFAULT_NAME)
 				.tell(new Master.RegistrationMessage(), this.self()); // 5. Here the worker communicates with the master for the first time, which is inside of masterSystem
-			System.out.println("WORKER IMPORTANT: " + this.self());
-			//Who can call the tell() function? Sender or receiver and why is the worker using master here with .tell()
+			//System.out.println("WORKER IMPORTANT*: " + this.self());
 		}
 	}
 	

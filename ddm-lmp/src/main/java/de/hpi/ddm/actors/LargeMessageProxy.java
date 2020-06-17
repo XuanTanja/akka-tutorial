@@ -54,6 +54,23 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 		private ActorRef receiver;
 	}
 
+
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	private  static class ConfigurationMessage implements Serializable {
+		private ActorRef sender;
+	}
+
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	private static class RequestMessage implements Serializable {
+		private ActorRef master; //master
+		private ActorRef sender; //largeMessageProxy from master
+		private ActorRef receiver; //worker
+	}
+
 	private byte[] messageOutgoing; //Whole message that is going to be sent
 	//private byte[] messageIngoing = new byte[0];
 	
@@ -114,8 +131,9 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 				.build();
 	}
 
-	private void handle(LargeMessage<?> message) { // 7. Master sends (sender) a LargeMessage to the Worker (receiver) which created a LargeMessageProxy but the Worker is not receiving the message, but the LargeMessageProxy.     ??Apparently the worker has no more contact with the master?? But why!!>???
-		ActorRef receiver = message.getReceiver();
+	//This handler is from the master/largeMessageProxy!
+	private void handle(LargeMessage<?> message) { // 7. Master sends (sender) a LargeMessage to the master/largeMessageProxy (and get received by this handler). Message contains message_info and the url to the worker (receiver) in the LargeMessage message
+		ActorRef receiver = message.getReceiver(); //thi is the worker url which was sent in the message LargeMessage
 		ActorSelection receiverProxy = this.context().actorSelection(receiver.path().child(DEFAULT_NAME));
 
 		//Starting kryo serialization (create Source -> create sink -> materialize)
@@ -124,12 +142,48 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 		//https://en.wikibooks.org/wiki/Java_Akka_Streams/Sources
 		this.messageOutgoing = KryoPoolSingleton.get().toBytesWithClass(message.getMessage()); //converting data into bytes and saving to array
 
+		//System.out.println("IMPORTANT: " + this.sender()+this.self()+this.receiver);
+		//receiverProxy.tell(new RequestMessage(this.sender(), this.self(), this.receiver), this.self()); //**!Send from worker to master (this.sender() is the master)
+
+
 		//Materializer from actor context
 		final Materializer materializer = ActorMaterializer.create(this.context());
 
 		Creator2 creator = new Creator2(); //TODO
+		Source<Creator2, NotUsed> source = Source.fromIterator(creator);
+
+		/*
+		Sink sink = Sink.actorRefWithAck(
+				message.getSender(),
+				new StreamInitializedMessage(),
+				Ack.INSTANCE,
+				new StreamCompletedMessage(),
+				err -> new StreamFailureMessage(err)
+		);
+
+		 */
+
+		//source.runWith()
+
 
 		//TODO pass creator to source and run it to generate the numbers from iterator
+
+		/*
+		Iterable<Integer> numbersOneToTen = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+		Source<Integer, NotUsed> source = Source.from(numbersOneToTen);
+		Sink<Integer, CompletionStage<Done>> foreach = Sink.foreach(System.out::println);
+		CompletionStage<Done> futureDone = source.runForeach(System.out::println, materializer);
+		futureDone.toCompletableFuture().join();
+
+		//Graph example
+		Iterable<Integer> numbersOneToTen = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+		Source<Integer, NotUsed> source = Source.from(numbersOneToTen);
+		Sink<Integer, CompletionStage<Done>> foreach = Sink.foreach(System.out::println);
+		RunnableGraph<CompletionStage<Done>> graph = source.toMat(foreach, Keep.right());
+		CompletionStage<Done> futureDone = graph.run(materializer);
+		futureDone.toCompletableFuture().join();
+		 */
+
 
 		/*
 		Sink sink = Sink.actorRefWithAck(
