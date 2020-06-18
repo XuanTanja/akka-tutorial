@@ -76,7 +76,7 @@ public class Reader extends AbstractLoggingActor {
 	}
 
 	private void handle(ReadMessage message) throws Exception {
-		this.sender().tell(new Master.BatchMessage(new ArrayList<>(this.buffer)), this.self());
+		this.sender().tell(new Master.BatchMessage(new ArrayList<>(this.buffer)), this.self()); //8. Reader sends master a BatchMessage with work
 		
 		this.read();
 	}

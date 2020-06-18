@@ -49,10 +49,10 @@ public class MasterSystem {
 		Cluster.get(system).registerOnMemberUp(new Runnable() {
 			@Override
 			public void run() {
-				for (int i = 0; i < c.getNumWorkers(); i++)
-					system.actorOf(Worker.props(), Worker.DEFAULT_NAME + i);
+				for (int i = 0; i < c.getNumWorkers(); i++) //1. Start workers and send  CurrentClusterState message
+					system.actorOf(Worker.props(), Worker.DEFAULT_NAME + i); //1. createw workers
 				
-				if (!c.isStartPaused())
+				if (!c.isStartPaused()) //6. MasterSystem tells Master to start
 					system.actorSelection("/user/" + Master.DEFAULT_NAME).tell(new Master.StartMessage(), ActorRef.noSender());
 			}
 		});
