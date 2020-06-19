@@ -70,6 +70,7 @@ public class Worker extends AbstractLoggingActor {
 				.match(CurrentClusterState.class, this::handle)
 				.match(MemberUp.class, this::handle)
 				.match(MemberRemoved.class, this::handle)
+				.match(Master.decryptHintMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
@@ -98,6 +99,14 @@ public class Worker extends AbstractLoggingActor {
 	private void handle(MemberRemoved message) {
 		if (this.masterSystem.equals(message.member()))
 			this.self().tell(PoisonPill.getInstance(), ActorRef.noSender());
+	}
+
+	private void handle(Master.decryptHintMessage message) { //10. Worker receives decryptHintMessage message and starts  decrypting
+		//TODO: decrypt the message trying put different permutations with the letters in the this message
+		// then send a message to master with decrypted message and store it in the fileIndex_PasswordHashMap.
+		// When master receives this message, it will check if all hints from the fileIndex have been decrypted.
+		// If this is true, it will send a message to start decrypting the password with the possible letters
+		// If it is false, it will send more hints to decrypt
 	}
 	
 	private String hash(String line) {

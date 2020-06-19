@@ -112,7 +112,7 @@ public class Master extends AbstractLoggingActor {
 		this.reader.tell(new Reader.ReadMessage(), this.self()); //7. Master tells reader message:  ReadMessage
 	}
 	
-	protected void handle(BatchMessage message) { //  9. HERE messages arrive in batches sent from Reader
+	protected void handle(BatchMessage message) { //HERE messages arrive in batches sent from Reader
 		
 		///////////////////////////////////////////////////////////////////////////////////////////////////////
 		// The input file is read in batches for two reasons: /////////////////////////////////////////////////
@@ -155,14 +155,21 @@ public class Master extends AbstractLoggingActor {
 				}
 			}
 			//System.out.println("hintCrackingQueue length: " + hintCrackingQueue.size());
-			//TODO:
-			//send hint cracking message from the hintCrackingQueue to the workers with free status. When worker finishes it sends a messageDone. Master reads it and sees if it can send
-			//a crack password message
+			this.sendDecryptHintMessage(); //9.Send messages from hintCrackingQueue to Workers that are free (workerOccupied)
 		}
 		//System.out.println(passwordFileIndexHashMap.size());
 		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
 		this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of messages
+	}
+
+	protected void sendDecryptHintMessage(){
+		//check hintCrackingQueue to see if it has messages to send (this is priority). But messages appear here when all hints have been decrypted
+		for (int i = 0; i < workerOccupied.size(); i++) {
+			if (this.workerOccupied.get(i)==false){
+				this.workers.get(i).tell(this.hintCrackingQueue.get(i), this.self());
+			}
+		}
 	}
 
 
