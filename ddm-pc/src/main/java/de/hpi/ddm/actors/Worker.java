@@ -43,9 +43,11 @@ public class Worker extends AbstractLoggingActor {
 	// Actor Messages //
 	////////////////////
 
+
+	public static class WorkerAvailableMessage implements Serializable{}
+
 	@Data
 	@AllArgsConstructor
-	@NoArgsConstructor
 	public static class DecryptedHint implements Serializable {
 		private int ID;
 		private String encryptedHint;
@@ -140,10 +142,14 @@ public class Worker extends AbstractLoggingActor {
 		List<String> allPermutations = new ArrayList<>(); //Not needed unless we want to see permutations checked
 		heapPermutation(message.getHintCharacterCombination(), message.getHintCharacterCombination().length, allPermutations);
 
+		//TODO Send message with available status!!!!
+
+		this.master.tell(new WorkerAvailableMessage(), this.self());
+
 		//here
-		System.out.println(this.hint);
-		System.out.println(hash(new String(message.getHintCharacterCombination())));
-		System.out.println("Size of permutations tried: " + allPermutations.size());
+		//System.out.println(this.hint);
+		//System.out.println(hash(new String(message.getHintCharacterCombination())));
+		//System.out.println("Size of permutations tried: " + allPermutations.size());
 	}
 
 	private void handle(Master.DecryptPassword message) { //13. Here worker receives a password to crack
@@ -205,6 +211,13 @@ public class Worker extends AbstractLoggingActor {
 			System.out.println(itr2.next());
 		}
 
+		//hintcharsfoundfinal [a,b]
+		//rearrange [ababababbba]
+
+		//output are chars available
+
+		//TODO: send message with decrypted password
+
 
 	}
 
@@ -234,31 +247,13 @@ public class Worker extends AbstractLoggingActor {
 		if (size == 1)
 		{
 			l.add(new String(a));//add permutation to a list but instead we can hash it here
+			//Hash permutation
 			String permutationHash = hash(new String(a));
-			//Compare this peremutationHash with the hint
-
-
-
-			//HashMap<String, Integer> hashmapcopy = (HashMap<String, Integer>) this.hintHashmap.clone();
-
-			//System.out.println("1. " + hintHashmap.get(permutationHash));
-
 			if(this.hint.equals(permutationHash)){
-				System.out.println("CRACKED!!!");
+				System.out.println("Hint Decrypted!!!");
+				//todo: send cracked message!!
+				this.master.tell(new DecryptedHint(this.ID, this.hint, new String(a)), this.self());
 			}
-
-			/*
-			try{
-				this.hintHashmap.get(permutationHash);
-				//System.out.println("Decrypted!!");
-				//this.master.tell(new DecryptedHint(this.ID, this.hint, new String(a)), this.self());
-
-				this.master.tell(new DecryptedHint(this.hintHashmap.remove(permutationHash), permutationHash, new String(a)), this.self());
-				//return;
-
-			}catch (NullPointerException e){}
-
-			 */
 
 		}
 

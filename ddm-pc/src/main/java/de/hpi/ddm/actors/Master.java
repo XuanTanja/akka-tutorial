@@ -117,7 +117,8 @@ public class Master extends AbstractLoggingActor {
 				.match(StartMessage.class, this::handle)
 				.match(BatchMessage.class, this::handle)
 				.match(Worker.DecryptedHint.class, this::handle)
-				.match(Worker.DecryptedPassword.class, this::handle)
+				//.match(Worker.DecryptedPasswor.class, this::handle)
+				.match(Worker.WorkerAvailableMessage.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
@@ -191,9 +192,11 @@ public class Master extends AbstractLoggingActor {
 	protected void sendDecryptHintMessage(){
 		for (int i = 0; i < workerOccupied.size(); i++) {
 			if (this.workerOccupied.get(i)==false){
-				DecryptHintMessage messageToSend = this.hintCrackingQueue.remove(); //.poll para ver si tiene elemento primero
-				this.workers.get(i).tell(messageToSend, this.self());
-				this.workerOccupied.set(i, true); //Set occupied
+				try {
+					DecryptHintMessage messageToSend = this.hintCrackingQueue.remove(); //.poll para ver si tiene elemento primero
+					this.workers.get(i).tell(messageToSend, this.self());
+					this.workerOccupied.set(i, true); //Set occupied
+				}catch (NoSuchElementException e){};
 			}
 		}
 	}
@@ -201,13 +204,28 @@ public class Master extends AbstractLoggingActor {
 	protected void sendDecryptPasswordMessage(){
 		for (int i = 0; i < workerOccupied.size(); i++) {
 			if (this.workerOccupied.get(i)==false){
-				DecryptPassword messageToSend = this.passwordCrackingQueue.remove(); //.poll para ver si tiene elemento primero
-				this.workers.get(i).tell(messageToSend, this.self());
-				this.workerOccupied.set(i, true); //Set occupied
+				try {
+					DecryptPassword messageToSend = this.passwordCrackingQueue.remove(); //.poll para ver si tiene elemento primero
+					this.workers.get(i).tell(messageToSend, this.self());
+					this.workerOccupied.set(i, true); //Set occupied
+				}catch (NoSuchElementException e){};
+
 			}
 		}
 	}
 
+	private void handle(Worker.WorkerAvailableMessage workerAvailableMessage) {
+		ActorRef messageSender = this.sender();
+		for (int i = 0; i < workers.size(); i++) {
+			if(messageSender.equals(workers.get(i))){
+				System.out.println("Worker is available");
+				this.workerOccupied.set(i, false); //Set available
+				sendDecryptPasswordMessage();
+				sendDecryptHintMessage();
+				break;
+			}
+		}
+	}
 
 	private void handle(Worker.DecryptedHint message) { //11. Master receives hint decrypted from worker. With this we know worker is free so we can send it more messages
 		//save the decrypted hint and send more work
@@ -216,9 +234,10 @@ public class Master extends AbstractLoggingActor {
 		String encrypted = message.getEncryptedHint();
 		String decrypted = message.getDecryptedHint();
 		ActorRef messageSender = this.sender();
+		System.out.println("DecryptedHint message received!!");
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
-				System.out.println("Worker X found");
+				System.out.println("Worker is available");
 				this.workerOccupied.set(i, false); //Set available
 				if(this.ID_PasswordHashMap.containsKey(ID)){
 
@@ -264,13 +283,14 @@ public class Master extends AbstractLoggingActor {
 //		this.log().info("Registered {}", this.sender());
 	}
 
+	/*
 	private void handle(Worker.DecryptedPassword message) {
 		int id = message.ID;
 
 		ActorRef messageSender = this.sender();
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
-				System.out.println("Worker X found");
+				System.out.println("Worker is available");
 				this.workerOccupied.set(i, false); //Set available
 				if(this.ID_PasswordHashMap.containsKey(id)){
 					ID_PasswordHashMap.get(id).setDecryptedPassword(message.password);
@@ -287,6 +307,8 @@ public class Master extends AbstractLoggingActor {
 			this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of passwords
 		}
 	}
+
+	 */
 
 	
 	protected void handle(Terminated message) {
