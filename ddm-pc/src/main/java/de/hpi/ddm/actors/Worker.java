@@ -52,7 +52,7 @@ public class Worker extends AbstractLoggingActor {
 	public void preStart() {
 		Reaper.watchWithDefaultReaper(this);
 		
-		this.cluster.subscribe(this.self(), MemberUp.class, MemberRemoved.class);
+		this.cluster.subscribe(this.self(), MemberUp.class, MemberRemoved.class); //2. subscribe to cluster
 	}
 
 	@Override
@@ -70,14 +70,15 @@ public class Worker extends AbstractLoggingActor {
 				.match(CurrentClusterState.class, this::handle)
 				.match(MemberUp.class, this::handle)
 				.match(MemberRemoved.class, this::handle)
+				.match(Master.decryptHintMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
 
-	private void handle(CurrentClusterState message) {
+	private void handle(CurrentClusterState message) { //3. receive this message from MasterSystem Cluster (registerOnMemberUp)
 		message.getMembers().forEach(member -> {
 			if (member.status().equals(MemberStatus.up()))
-				this.register(member);
+				this.register(member); //register all workers to the master
 		});
 	}
 
@@ -85,19 +86,27 @@ public class Worker extends AbstractLoggingActor {
 		this.register(message.member());
 	}
 
-	private void register(Member member) {
+	private void register(Member member) { //only used to register the workers (by sending message to the master and having master watch them)
 		if ((this.masterSystem == null) && member.hasRole(MasterSystem.MASTER_ROLE)) {
 			this.masterSystem = member;
 			
 			this.getContext()
 				.actorSelection(member.address() + "/user/" + Master.DEFAULT_NAME)
-				.tell(new Master.RegistrationMessage(), this.self());
+				.tell(new Master.RegistrationMessage(), this.self()); //4.Send message to Master
 		}
 	}
 	
 	private void handle(MemberRemoved message) {
 		if (this.masterSystem.equals(message.member()))
 			this.self().tell(PoisonPill.getInstance(), ActorRef.noSender());
+	}
+
+	private void handle(Master.decryptHintMessage message) { //10. Worker receives decryptHintMessage message and starts  decrypting
+		//TODO: decrypt the message trying put different permutations with the letters in the this message
+		// then send a message to master with decrypted message and store it in the fileIndex_PasswordHashMap.
+		// When master receives this message, it will check if all hints from the fileIndex have been decrypted.
+		// If this is true, it will send a message to start decrypting the password with the possible letters
+		// If it is false, it will send more hints to decrypt
 	}
 	
 	private String hash(String line) {
