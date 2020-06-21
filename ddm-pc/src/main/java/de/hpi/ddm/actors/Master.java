@@ -21,7 +21,7 @@ public class Master extends AbstractLoggingActor {
 	private int passwordLength = -1; //-1 when no batch has been read
 	private char[] charactersInPassword;
 	private List<char[]> possibleCombinationsForHintsList;
-	HashMap<Integer, Password> fileIndex_PasswordHashMap; //Hashmap with all fields from password file
+	HashMap<Integer, Password> ID_PasswordHashMap; //Hashmap with all fields from password file
 
 	//http://tutorials.jenkov.com/java-collections/queue.html
 	private Queue<DecryptHintMessage> hintCrackingQueue;
@@ -50,7 +50,7 @@ public class Master extends AbstractLoggingActor {
 		this.workerOccupied = new ArrayList<>();
 		this.possibleCombinationsForHintsList = new ArrayList<char[]>();
 		this.passwordLength = -1;
-		this.fileIndex_PasswordHashMap = new HashMap<Integer, Password>();
+		this.ID_PasswordHashMap = new HashMap<Integer, Password>();
 
 		this.hintCrackingQueue = new LinkedList<DecryptHintMessage>();
 		this.passwordCrackingQueue = new LinkedList<DecryptPassword>();
@@ -85,12 +85,16 @@ public class Master extends AbstractLoggingActor {
 
 	@Getter @Setter @ToString @AllArgsConstructor
 	public static class DecryptPassword implements Serializable {
+		//Maybe just send the object?
+		Password password;
+		/*
 		private int ID;
 		private String password;
 		private String[] hints;
 		private char[] hintCharacterCombination; //possible characters in the hint
 		private boolean messageAlreadySentToWorker = false;
 		private int length;
+		 */
 	}
 	
 	/////////////////////
@@ -158,21 +162,30 @@ public class Master extends AbstractLoggingActor {
 			for (int i = 4; i < messageLine.length; i++) {
 				passwordHints[i-4] = messageLine[i];
 			}
-			Password password = new Password(fileIndex, messageLine[1], messageLine[4], passwordHints);
+			Password password = new Password(fileIndex, messageLine[1], messageLine[4], passwordHints, this.charactersInPassword);
 			//System.out.println(password);
-			fileIndex_PasswordHashMap.put(password.getID(), password); //adding password to hashmap
+			ID_PasswordHashMap.put(password.getID(), password); //adding password to hashmap
 			for (int i = 0; i < password.getHintsEncryptedArray().length; i++) {
 				for (int j = 0; j < this.possibleCombinationsForHintsList.size(); j++) {
 					//add to queue
 					this.hintCrackingQueue.add(new DecryptHintMessage(password.getID(), password.getHintsEncryptedArray()[i], this.possibleCombinationsForHintsList.get(j)));//Add hint cracking task to hintCrackingQueue
 				}
 			}
+
+			if(this.passwordCrackingQueue.isEmpty()){ //If there are no elements in passwordCrackingQueue
+				this.sendDecryptHintMessage(); //9.Send messages from hintCrackingQueue to Workers that are free (workerOccupied)
+			}
+			else { //If there are elements in passwordCrackingQueue
+				//send decrypt password
+				sendDecryptPasswordMessage();
+			}
 			//System.out.println("hintCrackingQueue length: " + hintCrackingQueue.size());
-			this.sendDecryptHintMessage(); //9.Send messages from hintCrackingQueue to Workers that are free (workerOccupied)
+
 		}
 		//System.out.println(passwordFileIndexHashMap.size());
 		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
+		//TODO: decide when to tell reader to give master more batches (see if batches dictate when program ends or terminate is called)
 		//this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of messages
 	}
 
@@ -185,7 +198,16 @@ public class Master extends AbstractLoggingActor {
 			}
 		}
 	}
-	//hacer para decrypt message
+	//hacer para decrypt password
+	protected void sendDecryptPasswordMessage(){
+		for (int i = 0; i < workerOccupied.size(); i++) {
+			if (this.workerOccupied.get(i)==false){
+				DecryptPassword messageToSend = this.passwordCrackingQueue.remove(); //.poll para ver si tiene elemento primero
+				this.workers.get(i).tell(messageToSend, this.self());
+				this.workerOccupied.set(i, true); //Set occupied
+			}
+		}
+	}
 
 
 	private void handle(Worker.DecryptedHint message) { //11. Master receives hint decrypted from worker. With this we know worker is free so we can send it more messages
@@ -194,22 +216,29 @@ public class Master extends AbstractLoggingActor {
 		int ID = message.getID();
 		String encrypted = message.getEncryptedHint();
 		String decrypted = message.getDecryptedHint();
-		this.sender();
+		ActorRef messageSender = this.sender();
 		for (int i = 0; i < workers.size(); i++) {
-			if(this.sender().equals(workers.get(i))){
-				System.out.println("SIII");
-				this.workerOccupied.set(i, false); //Set occupied
+			if(messageSender.equals(workers.get(i))){
+				System.out.println("Worker X found");
+				this.workerOccupied.set(i, false); //Set available
+				if(this.ID_PasswordHashMap.containsKey(ID)){
+
+					this.ID_PasswordHashMap.get(ID).addDecryptedHint(decrypted, encrypted);
+				}
 			}
 		}
-
-		//check if all hints are cracked
+		//check if all hints from ID are cracked
+		boolean bool = this.ID_PasswordHashMap.get(ID).checkAllDecryptedHintsTrue();
+		if(bool == true){
+			//send decrypt password message to worker!
+			Password password = (Password) ID_PasswordHashMap.get(ID).clone(); //clone the password from hashmap to send to the worker
+			this.passwordCrackingQueue.add(new DecryptPassword(password));
+			sendDecryptPasswordMessage(); //12. send password cracking
+		}
+		else { //If not all hints are cracked
+			sendDecryptHintMessage();
+		}
 	}
-
-	private boolean checkDecryptedHints(int ID){
-
-		return false;
-	}
-
 
 	
 	protected void terminate() {
@@ -277,8 +306,9 @@ public class Master extends AbstractLoggingActor {
 		private String[] hintsEncryptedArray;
 		private String[] hintsDecryptedArray;
 		private boolean crackedPassword;
+		private char[] possibleCharacters;
 
-		public Password(int ID, String name, String encryptedPassword, String[] hintsEncryptedArray){
+		public Password(int ID, String name, String encryptedPassword, String[] hintsEncryptedArray, char[] alphabet){
 			this.ID = ID;
 			this.name = name;
 			this.encryptedPassword = encryptedPassword;
@@ -286,7 +316,8 @@ public class Master extends AbstractLoggingActor {
 			this.hintsEncryptedArray = hintsEncryptedArray.clone();
 			this.hintsDecryptedArray = new String[this.hintsEncryptedArray.length];
 			Arrays.fill(this.hintsDecryptedArray, "");
-			crackedPassword = false;
+			this.crackedPassword = false;
+			this.possibleCharacters = alphabet;
 		}
 
 		public Object clone(){
@@ -295,6 +326,42 @@ public class Master extends AbstractLoggingActor {
 			} catch (CloneNotSupportedException e){
 				return this;
 			}
+		}
+
+		public void setHintsDecryptedArrayWithIndex(int index, String stringValue){
+			hintsDecryptedArray[index] = stringValue;
+		}
+
+		public String getHintsDecryptedArrayWithIndex(int index){
+			 return hintsDecryptedArray[index];
+		}
+
+		public String getHintsEncryptedArrayWithIndex(int index){
+			return hintsEncryptedArray[index];
+		}
+
+		public int getIndexOFHintsEncryptedArrayElement(String stringElement){
+			for (int i = 0; i < hintsEncryptedArray.length; i++) {
+				if(stringElement.equals(hintsEncryptedArray[i])){
+					return i;
+				}
+			}
+			return -1;
+		}
+
+		public void addDecryptedHint(String encrypted, String decrypted){
+			int index = getIndexOFHintsEncryptedArrayElement(encrypted);
+			setHintsDecryptedArrayWithIndex(index, decrypted);
+		}
+
+		//create method to check if all hintsDecryptedArray are different than '' (empty)
+		public boolean checkAllDecryptedHintsTrue(){
+			for (int i = 0; i < hintsDecryptedArray.length; i++) {
+				if(hintsDecryptedArray[i].equals("")){
+					return false;
+				}
+			}
+			return true; //if there is no empty message
 		}
 	}
 

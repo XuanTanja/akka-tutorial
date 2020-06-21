@@ -5,6 +5,8 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 import akka.actor.AbstractLoggingActor;
@@ -37,6 +39,7 @@ public class Worker extends AbstractLoggingActor {
 
 	public Worker() {
 		this.cluster = Cluster.get(this.context().system());
+		this.hintHashmap = new HashMap<>();
 	}
 	
 	////////////////////
@@ -62,6 +65,7 @@ public class Worker extends AbstractLoggingActor {
 	private ActorRef master;
 	private String hint;
 	private int ID;
+	private HashMap<String, Integer> hintHashmap;
 	
 	/////////////////////
 	// Actor Lifecycle //
@@ -90,6 +94,7 @@ public class Worker extends AbstractLoggingActor {
 				.match(MemberUp.class, this::handle)
 				.match(MemberRemoved.class, this::handle)
 				.match(Master.DecryptHintMessage.class, this::handle)
+				.match(Master.DecryptPassword.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
@@ -125,15 +130,63 @@ public class Worker extends AbstractLoggingActor {
 		this.master = this.sender();
 		this.ID = message.getID();
 		this.hint = message.getHint();
+
+		this.hintHashmap.put(message.getHint(), message.getID());
+
+
 		this.log().info("Started decrypting hint");
+
+		System.out.println(this.hint);
+		//System.out.println(this.hintHashmap.get(message.getHint()));
+
+
 		List<String> allPermutations = new ArrayList<>(); //Not needed unless we want to see permutations checked
 		heapPermutation(message.getHintCharacterCombination(), message.getHintCharacterCombination().length, allPermutations);
 
+		//here
 		System.out.println(this.hint);
 		System.out.println(hash(new String(message.getHintCharacterCombination())));
 		System.out.println("Size of permutations tried: " + allPermutations.size());
 	}
 
+	private void handle(Master.DecryptPassword message) { //13. Here worker receives a password to crack
+		//see how to get characters from the hints!
+		//Master should send all hints (so the password object) through here so the worker can work on the password
+		int ID = message.getPassword().getID(); //Fields are obtained in this way
+
+
+
+		String decryptedPassword = message.getPassword().getDecryptedPassword(); //This we should change
+		//decryptedPassword =  message.getPassword().setDecryptedPassword("");
+		//Send ID and decrypted password back to master (new message)
+
+
+
+		String[] hints = message.getPassword().getHintsDecryptedArray().clone();
+
+		char [] alphabet = message.getPassword().getPossibleCharacters();
+
+		//iterate through hints and check if lettter is in alphabet and delete, for all hints
+
+		/*
+		List alphabet_aux = Arrays.asList(alphabet);
+
+		for (int i = 0; i < hints.length; i++) {
+			for (int j = 0; i < hints[i].length(); j++){ //hints chars iteration
+				char c = hints[i].charAt(j);
+				//check if
+				for (int k = 0; k < alphabet_aux.size(); k++) { //alphabet iteration
+					ArrayList<Character> chars_to_remove = new ArrayList<Character>();
+					if(alphabet[k] == c){
+						chars_to_remove.add(alphabet[k]);
+						//
+					}
+				}
+			}
+		}
+		 */
+
+	}
 
 	
 	private String hash(String line) {
@@ -164,12 +217,29 @@ public class Worker extends AbstractLoggingActor {
 			String permutationHash = hash(new String(a));
 			//Compare this peremutationHash with the hint
 
+
+
+			//HashMap<String, Integer> hashmapcopy = (HashMap<String, Integer>) this.hintHashmap.clone();
+
+			//System.out.println("1. " + hintHashmap.get(permutationHash));
+
 			if(this.hint.equals(permutationHash)){
-				//Send message
-				System.out.println("Decrypted!!");
-				this.master.tell(new DecryptedHint(this.ID, this.hint, new String(a)), this.self());
-				//return;
+				System.out.println("CRACKED!!!");
 			}
+
+			/*
+			try{
+				this.hintHashmap.get(permutationHash);
+				//System.out.println("Decrypted!!");
+				//this.master.tell(new DecryptedHint(this.ID, this.hint, new String(a)), this.self());
+
+				this.master.tell(new DecryptedHint(this.hintHashmap.remove(permutationHash), permutationHash, new String(a)), this.self());
+				//return;
+
+			}catch (NullPointerException e){}
+
+			 */
+
 		}
 
 
