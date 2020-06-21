@@ -117,6 +117,7 @@ public class Master extends AbstractLoggingActor {
 				.match(StartMessage.class, this::handle)
 				.match(BatchMessage.class, this::handle)
 				.match(Worker.DecryptedHint.class, this::handle)
+				.match(Worker.DecryptedPassword.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
@@ -185,8 +186,6 @@ public class Master extends AbstractLoggingActor {
 		//System.out.println(passwordFileIndexHashMap.size());
 		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
-		//TODO: decide when to tell reader to give master more batches (see if batches dictate when program ends or terminate is called)
-		//this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of messages
 	}
 
 	protected void sendDecryptHintMessage(){
@@ -234,6 +233,7 @@ public class Master extends AbstractLoggingActor {
 			Password password = (Password) ID_PasswordHashMap.get(ID).clone(); //clone the password from hashmap to send to the worker
 			this.passwordCrackingQueue.add(new DecryptPassword(password));
 			sendDecryptPasswordMessage(); //12. send password cracking
+			sendDecryptHintMessage();
 		}
 		else { //If not all hints are cracked
 			sendDecryptHintMessage();
@@ -263,14 +263,35 @@ public class Master extends AbstractLoggingActor {
 		//System.out.println("workerOccupied size: " + workerOccupied);
 //		this.log().info("Registered {}", this.sender());
 	}
+
+	private void handle(Worker.DecryptedPassword message) {
+		int id = message.ID;
+
+		ActorRef messageSender = this.sender();
+		for (int i = 0; i < workers.size(); i++) {
+			if(messageSender.equals(workers.get(i))){
+				System.out.println("Worker X found");
+				this.workerOccupied.set(i, false); //Set available
+				if(this.ID_PasswordHashMap.containsKey(id)){
+					ID_PasswordHashMap.get(id).setDecryptedPassword(message.password);
+					//Send solution to the collector
+					this.collector.tell(new Collector.CollectMessage("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + ID_PasswordHashMap.get(id).getDecryptedPassword()), this.self());
+				}
+			}
+		}
+
+		sendDecryptPasswordMessage();
+		sendDecryptHintMessage();
+
+		if(passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty()){ //Check to see if there are more tasks in queues
+			this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of passwords
+		}
+	}
+
 	
 	protected void handle(Terminated message) {
 		this.context().unwatch(message.getActor());
 		this.workers.remove(message.getActor());
-		//TODO: remove these workers from the arrays below
-		//this.workers
-		//this.workerOccupied
-
 //		this.log().info("Unregistered {}", message.getActor());
 	}
 
@@ -361,7 +382,7 @@ public class Master extends AbstractLoggingActor {
 					return false;
 				}
 			}
-			return true; //if there is no empty message
+			return true; //if there is no empty hint
 		}
 	}
 
