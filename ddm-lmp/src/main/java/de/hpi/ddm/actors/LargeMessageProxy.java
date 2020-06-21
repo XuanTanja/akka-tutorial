@@ -25,8 +25,8 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 	////////////////////////
 
 	public static final String DEFAULT_NAME = "largeMessageProxy";
-	private ActorRef masterField_worker_receiver_url; //receiver
-	private ActorRef master_largeMessageProxy; //sender
+	private ActorRef masterField_worker_receiver_url;
+	private ActorRef master_largeMessageProxy;
 	private List<Byte> requestIncoming = new ArrayList<Byte>();
 	private byte[] messageOutgoing = new byte[0];  //Whole message that is going to be sent
 
@@ -58,7 +58,7 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 	public static class LargeMessage<T> implements Serializable {
 		private static final long serialVersionUID = -6744533868121116774L;
 		private T message;
-		private ActorRef message_receiver_worker_master; //receiver
+		private ActorRef message_receiver_worker_master;
 	}
 
 	@Data
@@ -66,8 +66,8 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 	@AllArgsConstructor
 	private static class MasterInquiryMessage implements Serializable { //Send message asking if worker can receive a message
 		private ActorRef master; //master
-		private ActorRef master_largeMessageProxy_url; //largeMessageProxy from master ~sender
-		private ActorRef receiver_worker; //worker ~receiver
+		private ActorRef master_largeMessageProxy_url; //largeMessageProxy from master
+		private ActorRef receiver_worker; //worker
 	}
 
 
