@@ -160,7 +160,7 @@ public class Worker extends AbstractLoggingActor {
 
 
 		String decryptedPassword = message.getPassword().getDecryptedPassword(); //This we should change
-		//decryptedPassword =  message.getPassword().setDecryptedPassword("");
+		//String decryptedPassword =  message.getPassword().setDecryptedPassword("");
 		//Send ID and decrypted password back to master (new message)
 
 		//String[] hints = message.getPassword().getHintsDecryptedArray().clone();
@@ -171,7 +171,15 @@ public class Worker extends AbstractLoggingActor {
 		char[] alphabet = message.getPassword().getPossibleCharacters();
 		//alphabet = [A], [B], [C], ...
 
-		List<Character> hintcharsfound = new ArrayList<Character>();
+		List<Character> hintCharList = getMissingCharactersofHint(hints, alphabet);
+		Character[] hintCharArray = hintCharList.toArray(new Character[hintCharList.size()]);
+
+		possibleStrings(message.getPassword().getPossibleCharacters().length, hintCharArray, "");
+
+	}
+
+	private List<Character> getMissingCharactersofHint (String[] hints, char[] alphabet){
+		List<Character> hintchars = new ArrayList<Character>();
 		//iterate through hints and check if lettter is in alphabet and delete, for all hints
 
 		for (int i = 0; i < hints.length; i++) {
@@ -180,15 +188,15 @@ public class Worker extends AbstractLoggingActor {
 			for (int j = 0; j < stringToCharArray.length; j++) {
 				char hintChar = stringToCharArray[j]; // A
 				for (int k = 0; k < alphabet.length; k++) {
-					if (hintChar == alphabet[k] && !hintcharsfound.contains(hintChar)) {
-						hintcharsfound.add(hintChar);
+					if (hintChar == alphabet[k] && !hintchars.contains(hintChar)) {
+						hintchars.add(hintChar);
 					}
 				}
 			}
 		}
 
 
-		Iterator<Character> itr = hintcharsfound.iterator();
+		Iterator<Character> itr = hintchars.iterator();
 		while (itr.hasNext()) {
 			char element = itr.next();
 			for (int m = 0; m < alphabet.length; m++) {
@@ -198,27 +206,34 @@ public class Worker extends AbstractLoggingActor {
 			}
 		}
 
-		List<Character> hintcharsfoundfinal = new ArrayList<Character>();
+		List<Character> hintcharsFound = new ArrayList<Character>();
 		for (int n = 0; n < alphabet.length; n++) {
 			if (alphabet[n] != 0) {
-				hintcharsfoundfinal.add(alphabet[n]);
+				hintcharsFound.add(alphabet[n]);
 			}
 		}
 
+		return hintcharsFound;
+	}
 
-		Iterator<Character> itr2 = hintcharsfoundfinal.iterator();
-		while (itr2.hasNext()) {
-			System.out.println(itr2.next());
+	public static void possibleStrings(int maxLength, Character[] alphabet, String curr) {
+
+		// If the current string has reached it's maximum length
+		String password = "ABC"; //TODO: there would be the real password
+		if(curr.length() == maxLength) {
+			if (curr.equals(password)){
+				System.out.println("password found!");
+			}
+
+			// Else add each letter from the alphabet to new strings and process these new strings again
+		} else {
+			for(int i = 0; i < alphabet.length; i++) {
+				String oldCurr = curr;
+				curr += alphabet[i];
+				possibleStrings(maxLength,alphabet,curr);
+				curr = oldCurr;
+			}
 		}
-
-		//hintcharsfoundfinal [a,b]
-		//rearrange [ababababbba]
-
-		//output are chars available
-
-		//TODO: send message with decrypted password
-
-
 	}
 
 	
