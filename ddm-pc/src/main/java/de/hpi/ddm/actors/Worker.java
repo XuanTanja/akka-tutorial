@@ -4,10 +4,7 @@ import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
@@ -160,31 +157,54 @@ public class Worker extends AbstractLoggingActor {
 		//decryptedPassword =  message.getPassword().setDecryptedPassword("");
 		//Send ID and decrypted password back to master (new message)
 
+		//String[] hints = message.getPassword().getHintsDecryptedArray().clone();
+		String[] hints = message.getPassword().getHintsDecryptedArray();
+		//hints: [ABCDEF], [ACDEFG],...
 
+		//char [] alphabet = message.getPassword().getPossibleCharacters();
+		char[] alphabet = message.getPassword().getPossibleCharacters();
+		//alphabet = [A], [B], [C], ...
 
-		String[] hints = message.getPassword().getHintsDecryptedArray().clone();
-
-		char [] alphabet = message.getPassword().getPossibleCharacters();
-
+		List<Character> hintcharsfound = new ArrayList<Character>();
 		//iterate through hints and check if lettter is in alphabet and delete, for all hints
 
-		/*
-		List alphabet_aux = Arrays.asList(alphabet);
-
 		for (int i = 0; i < hints.length; i++) {
-			for (int j = 0; i < hints[i].length(); j++){ //hints chars iteration
-				char c = hints[i].charAt(j);
-				//check if
-				for (int k = 0; k < alphabet_aux.size(); k++) { //alphabet iteration
-					ArrayList<Character> chars_to_remove = new ArrayList<Character>();
-					if(alphabet[k] == c){
-						chars_to_remove.add(alphabet[k]);
-						//
+			String hintList = hints[i]; // ABCDEFG
+			char[] stringToCharArray = hintList.toCharArray();
+			for (int j = 0; j < stringToCharArray.length; j++) {
+				char hintChar = stringToCharArray[j]; // A
+				for (int k = 0; k < alphabet.length; k++) {
+					if (hintChar == alphabet[k] && !hintcharsfound.contains(hintChar)) {
+						hintcharsfound.add(hintChar);
 					}
 				}
 			}
 		}
-		 */
+
+
+		Iterator<Character> itr = hintcharsfound.iterator();
+		while (itr.hasNext()) {
+			char element = itr.next();
+			for (int m = 0; m < alphabet.length; m++) {
+				if (element == alphabet[m]) {
+					alphabet[m] = 0;
+				}
+			}
+		}
+
+		List<Character> hintcharsfoundfinal = new ArrayList<Character>();
+		for (int n = 0; n < alphabet.length; n++) {
+			if (alphabet[n] != 0) {
+				hintcharsfoundfinal.add(alphabet[n]);
+			}
+		}
+
+
+		Iterator<Character> itr2 = hintcharsfoundfinal.iterator();
+		while (itr2.hasNext()) {
+			System.out.println(itr2.next());
+		}
+
 
 	}
 
