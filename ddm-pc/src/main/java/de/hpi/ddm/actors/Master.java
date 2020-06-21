@@ -1,10 +1,7 @@
 package de.hpi.ddm.actors;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
@@ -26,8 +23,9 @@ public class Master extends AbstractLoggingActor {
 	private List<char[]> possibleCombinationsForHintsList;
 	HashMap<Integer, Password> fileIndex_PasswordHashMap; //Hashmap with all fields from password file
 
-	private  List<decryptHintMessage> hintCrackingQueue;
-	//private  List<CrackPasswordMessage> hintCrackingQueue;
+	//http://tutorials.jenkov.com/java-collections/queue.html
+	private Queue<DecryptHintMessage> hintCrackingQueue;
+	private  Queue<DecryptPassword> passwordCrackingQueue;
 
 	//Actor references
 	private final ActorRef reader;
@@ -53,7 +51,9 @@ public class Master extends AbstractLoggingActor {
 		this.possibleCombinationsForHintsList = new ArrayList<char[]>();
 		this.passwordLength = -1;
 		this.fileIndex_PasswordHashMap = new HashMap<Integer, Password>();
-		this.hintCrackingQueue = new ArrayList<>();
+
+		this.hintCrackingQueue = new LinkedList<DecryptHintMessage>();
+		this.passwordCrackingQueue = new LinkedList<DecryptPassword>();
 	}
 
 	////////////////////
@@ -77,10 +77,20 @@ public class Master extends AbstractLoggingActor {
 	}
 
 	@Getter @Setter @ToString @AllArgsConstructor
-	public static class decryptHintMessage implements Serializable {
-		private int fileIndex;
+	public static class DecryptHintMessage implements Serializable {
+		private int ID;
 		private String hint;
 		private char[] hintCharacterCombination; //possible characters in the hint
+	}
+
+	@Getter @Setter @ToString @AllArgsConstructor
+	public static class DecryptPassword implements Serializable {
+		private int ID;
+		private String password;
+		private String[] hints;
+		private char[] hintCharacterCombination; //possible characters in the hint
+		private boolean messageAlreadySentToWorker = false;
+		private int length;
 	}
 	
 	/////////////////////
@@ -99,13 +109,15 @@ public class Master extends AbstractLoggingActor {
 	@Override
 	public Receive createReceive() {
 		return receiveBuilder()
+				.match(RegistrationMessage.class, this::handle)
 				.match(StartMessage.class, this::handle)
 				.match(BatchMessage.class, this::handle)
+				.match(Worker.DecryptedHint.class, this::handle)
 				.match(Terminated.class, this::handle)
-				.match(RegistrationMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
+
 
 	protected void handle(StartMessage message) {
 		this.startTime = System.currentTimeMillis();
@@ -148,10 +160,11 @@ public class Master extends AbstractLoggingActor {
 			}
 			Password password = new Password(fileIndex, messageLine[1], messageLine[4], passwordHints);
 			//System.out.println(password);
-			fileIndex_PasswordHashMap.put(password.getFileIndex(), password); //adding password to hashmap
+			fileIndex_PasswordHashMap.put(password.getID(), password); //adding password to hashmap
 			for (int i = 0; i < password.getHintsEncryptedArray().length; i++) {
 				for (int j = 0; j < this.possibleCombinationsForHintsList.size(); j++) {
-					this.hintCrackingQueue.add(new decryptHintMessage(password.getFileIndex(), password.getHintsEncryptedArray()[i], this.possibleCombinationsForHintsList.get(j)));//Add hint cracking task to hintCrackingQueue
+					//add to queue
+					this.hintCrackingQueue.add(new DecryptHintMessage(password.getID(), password.getHintsEncryptedArray()[i], this.possibleCombinationsForHintsList.get(j)));//Add hint cracking task to hintCrackingQueue
 				}
 			}
 			//System.out.println("hintCrackingQueue length: " + hintCrackingQueue.size());
@@ -160,16 +173,41 @@ public class Master extends AbstractLoggingActor {
 		//System.out.println(passwordFileIndexHashMap.size());
 		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
-		this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of messages
+		//this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of messages
 	}
 
 	protected void sendDecryptHintMessage(){
-		//check hintCrackingQueue to see if it has messages to send (this is priority). But messages appear here when all hints have been decrypted
 		for (int i = 0; i < workerOccupied.size(); i++) {
 			if (this.workerOccupied.get(i)==false){
-				this.workers.get(i).tell(this.hintCrackingQueue.get(i), this.self());
+				DecryptHintMessage messageToSend = this.hintCrackingQueue.remove(); //.poll para ver si tiene elemento primero
+				this.workers.get(i).tell(messageToSend, this.self());
+				this.workerOccupied.set(i, true); //Set occupied
 			}
 		}
+	}
+	//hacer para decrypt message
+
+
+	private void handle(Worker.DecryptedHint message) { //11. Master receives hint decrypted from worker. With this we know worker is free so we can send it more messages
+		//save the decrypted hint and send more work
+		//first try to send work for password then for hints
+		int ID = message.getID();
+		String encrypted = message.getEncryptedHint();
+		String decrypted = message.getDecryptedHint();
+		this.sender();
+		for (int i = 0; i < workers.size(); i++) {
+			if(this.sender().equals(workers.get(i))){
+				System.out.println("SIII");
+				this.workerOccupied.set(i, false); //Set occupied
+			}
+		}
+
+		//check if all hints are cracked
+	}
+
+	private boolean checkDecryptedHints(int ID){
+
+		return false;
 	}
 
 
@@ -232,7 +270,7 @@ public class Master extends AbstractLoggingActor {
  	//https://projectlombok.org/features/Data
 	@Getter @Setter @ToString
 	protected class Password implements Serializable, Cloneable{
-		private int fileIndex;
+		private int ID;
 		private String name;
 		private String encryptedPassword;
 		private String decryptedPassword;
@@ -240,8 +278,8 @@ public class Master extends AbstractLoggingActor {
 		private String[] hintsDecryptedArray;
 		private boolean crackedPassword;
 
-		public Password(int fileIndex, String name, String encryptedPassword, String[] hintsEncryptedArray){
-			this.fileIndex = fileIndex;
+		public Password(int ID, String name, String encryptedPassword, String[] hintsEncryptedArray){
+			this.ID = ID;
 			this.name = name;
 			this.encryptedPassword = encryptedPassword;
 			this.decryptedPassword = "";
