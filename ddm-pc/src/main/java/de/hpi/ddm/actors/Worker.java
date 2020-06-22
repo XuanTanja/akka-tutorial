@@ -168,8 +168,8 @@ public class Worker extends AbstractLoggingActor {
 		System.out.println("encryptedPassword: " + encrypted);
 
 
-		String[] hints = message.getPassword().getHintsDecryptedArray();
-		char[] alphabet = message.getPassword().getPossibleCharacters();
+		String[] hints = message.getPassword().getHintsDecryptedArray().clone();
+		char[] alphabet = message.getPassword().getPossibleCharacters().clone();
 
 
 		char[] set = getMissingCharactersofHint(hints, alphabet);
