@@ -34,8 +34,12 @@ public class Worker extends AbstractLoggingActor {
 		return Props.create(Worker.class);
 	}
 
+	private boolean stop;
+	private String decryptedPassword;
+
 	public Worker() {
 		this.cluster = Cluster.get(this.context().system());
+		this.decryptedPassword = "";
 	}
 	
 	////////////////////
@@ -51,6 +55,14 @@ public class Worker extends AbstractLoggingActor {
 		private int ID;
 		private String encryptedHint;
 		private String decryptedHint;
+	}
+
+	@Data
+	@AllArgsConstructor
+	public static class DecryptedPassword implements Serializable {
+		private int ID;
+		private String encryptedPassword;
+		private String decryptedPassword;
 	}
 
 	/////////////////
@@ -133,14 +145,15 @@ public class Worker extends AbstractLoggingActor {
 		//System.out.println(this.hint);
 
 		List<String> allPermutations = new ArrayList<>(); //Not needed unless we want to see permutations checked
+		this.stop = false;
 		heapPermutation(message.getHintCharacterCombination(), message.getHintCharacterCombination().length, allPermutations);
+		this.log().info("Size of permutations tried: " + allPermutations.size());
 
 		this.master.tell(new WorkerAvailableMessage(), this.self()); //tell master it is free
 
 		//here
 		//System.out.println(this.hint);
 		//System.out.println(hash(new String(message.getHintCharacterCombination())));
-		//System.out.println("Size of permutations tried: " + allPermutations.size());
 	}
 
 	private void handle(Master.DecryptPassword message) { //13. Here worker receives a password to crack
@@ -149,23 +162,38 @@ public class Worker extends AbstractLoggingActor {
 		int ID = message.getPassword().getID(); //Fields are obtained in this way
 
 
-
-		String decryptedPassword = message.getPassword().getDecryptedPassword(); //This we should change
+		String encrypted = message.getPassword().getEncryptedPassword(); //This we should change
+		System.out.println("decryptedPassword: " + decryptedPassword);
 		//String decryptedPassword =  message.getPassword().setDecryptedPassword("");
 		//Send ID and decrypted password back to master (new message)
 
 		//String[] hints = message.getPassword().getHintsDecryptedArray().clone();
 		String[] hints = message.getPassword().getHintsDecryptedArray();
+		System.out.println("hints: " );
+		for (int i = 0; i < hints.length; i++) {
+			System.out.print(hints[i]);
+		}
 		//hints: [ABCDEF], [ACDEFG],...
 
 		//char [] alphabet = message.getPassword().getPossibleCharacters();
 		char[] alphabet = message.getPassword().getPossibleCharacters();
+		System.out.println("Alphabet: " );
+		for (int i = 0; i < alphabet.length; i++) {
+			System.out.print(alphabet[i]);
+		}
 		//alphabet = [A], [B], [C], ...
 
 		List<Character> hintCharList = getMissingCharactersofHint(hints, alphabet);
 		Character[] hintCharArray = hintCharList.toArray(new Character[hintCharList.size()]);
 
-		possibleStrings(message.getPassword().getPossibleCharacters().length, hintCharArray, "");
+		possibleStrings(message.getPassword().getPossibleCharacters().length, hintCharArray, "", encrypted);
+		if(!this.decryptedPassword.equals("")){
+			//tell  master
+			this.master.tell(new DecryptedPassword(ID, encrypted, this.decryptedPassword), this.self());
+			System.out.println("Password: " + this.decryptedPassword);
+		}
+		//Here hash each combination and test if it equals the encrypted password
+
 
 	}
 
@@ -207,7 +235,7 @@ public class Worker extends AbstractLoggingActor {
 		return hintcharsFound;
 	}
 
-	public static void possibleStrings(int maxLength, Character[] alphabet, String curr) {
+	public void possibleStrings(int maxLength, Character[] alphabet, String curr, String encrypted) {
 
 		// If the current string has reached it's maximum length
 		//For Tanja: you can get ID through:
@@ -218,10 +246,16 @@ public class Worker extends AbstractLoggingActor {
 		//But everrything should go in : private void handle(Master.DecryptPassword message) function
 		//And the available fields are in the Password class at the end of the Master
 
-		String password = "ABC"; //TODO: there would be the real password
+		//String password = "ABC"; //TODO: there would be the real password
+		String password = encrypted;
+
+
 		if(curr.length() == maxLength) {
-			if (curr.equals(password)){
-				System.out.println("password found!");
+			String curr_hashed = hash(curr);
+			if (curr_hashed.equals(password)){
+				System.out.println("***Password found!");
+				this.decryptedPassword = curr;
+
 			}
 
 			// Else add each letter from the alphabet to new strings and process these new strings again
@@ -229,7 +263,7 @@ public class Worker extends AbstractLoggingActor {
 			for(int i = 0; i < alphabet.length; i++) {
 				String oldCurr = curr;
 				curr += alphabet[i];
-				possibleStrings(maxLength,alphabet,curr);
+				possibleStrings(maxLength,alphabet,curr, encrypted);
 				curr = oldCurr;
 			}
 		}
@@ -258,14 +292,20 @@ public class Worker extends AbstractLoggingActor {
 	//This implementation is inefficient because it calculates a permutation for each hint (instead of grouping all hints per permutation to calculate a permutation only once)
 	private void heapPermutation(char[] a, int size, List<String> l) {
 		// If size is 1, store the obtained permutation
+		if (this.stop){
+			return;
+		}
+
 		if (size == 1)
 		{
 			l.add(new String(a));//add permutation to a list but instead we can hash it here
 			//Hash permutation
 			String permutationHash = hash(new String(a));
 			if(this.hint.equals(permutationHash)){
+				this.stop = true;
 				this.log().info("Hint decrypted");
 				this.master.tell(new DecryptedHint(this.ID, this.hint, new String(a)), this.self());
+
 			}
 
 		}

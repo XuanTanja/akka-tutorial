@@ -117,7 +117,7 @@ public class Master extends AbstractLoggingActor {
 				.match(StartMessage.class, this::handle)
 				.match(BatchMessage.class, this::handle)
 				.match(Worker.DecryptedHint.class, this::handle)
-				//.match(Worker.DecryptedPasswor.class, this::handle)
+				.match(Worker.DecryptedPassword.class, this::handle)
 				.match(Worker.WorkerAvailableMessage.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
@@ -160,7 +160,6 @@ public class Master extends AbstractLoggingActor {
 			//System.out.println(Arrays.toString(messageLine)); //Print message
 			//System.out.println(messageLine[4]);
 			int ID = Integer.parseInt(messageLine[0]);
-
 			passwordHints = new String[messageLine.length-5];
 			for (int i = 5; i < messageLine.length; i++) {
 				passwordHints[i-5] = messageLine[i];
@@ -243,11 +242,13 @@ public class Master extends AbstractLoggingActor {
 		String encrypted = message.getEncryptedHint();
 		String decrypted = message.getDecryptedHint();
 		ActorRef messageSender = this.sender();
+		this.log().info("ID: " + ID + " | decrypted: " + decrypted);
 		//System.out.println("DecryptedHint message received!!");
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
 				this.workerOccupied.set(i, false); //Set available
 				if(this.ID_PasswordHashMap.containsKey(ID)){
+					this.log().info("Added hint to hashmap");
 					this.ID_PasswordHashMap.get(ID).addDecryptedHint(encrypted, decrypted);
 					//System.out.println(this.ID_PasswordHashMap.get(ID).toString());
 					System.out.println(this.ID_PasswordHashMap.get(ID).toString());
@@ -293,9 +294,9 @@ public class Master extends AbstractLoggingActor {
 //		this.log().info("Registered {}", this.sender());
 	}
 
-	/*
+
 	private void handle(Worker.DecryptedPassword message) {
-		int id = message.ID;
+		int id = message.getID();
 
 		ActorRef messageSender = this.sender();
 		for (int i = 0; i < workers.size(); i++) {
@@ -303,7 +304,7 @@ public class Master extends AbstractLoggingActor {
 				System.out.println("Worker is available");
 				this.workerOccupied.set(i, false); //Set available
 				if(this.ID_PasswordHashMap.containsKey(id)){
-					ID_PasswordHashMap.get(id).setDecryptedPassword(message.password);
+					ID_PasswordHashMap.get(id).setDecryptedPassword(message.getDecryptedPassword());
 					//Send solution to the collector
 					this.collector.tell(new Collector.CollectMessage("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + ID_PasswordHashMap.get(id).getDecryptedPassword()), this.self());
 				}
@@ -318,7 +319,7 @@ public class Master extends AbstractLoggingActor {
 		}
 	}
 
-	 */
+
 
 	
 	protected void handle(Terminated message) {
