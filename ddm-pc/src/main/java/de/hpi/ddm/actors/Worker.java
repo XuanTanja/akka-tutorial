@@ -193,8 +193,44 @@ public class Worker extends AbstractLoggingActor {
 
 	private char[] getMissingCharactersofHint (String[] hints, char[] alphabet){
 
-		char[] hintcharsFound = {'A'};
-		return hintcharsFound;
+		List<Character> alphabetList = new ArrayList<Character>();
+		for (char c : alphabet) {
+			alphabetList.add(c);
+		}
+
+
+		for (String hintString : hints) {
+			//System.out.println(hintString);
+			List<Character> newAlphabet =  new ArrayList<Character>();
+			String tempHint = hintString; // HJKGDEFBIC
+			for (int i = 0; i < tempHint.length(); i++) {
+				//System.out.println(tempHint.charAt(i));
+				char hintChar =tempHint.charAt(i); //H J K
+				for (int k = 0; k < alphabetList.size(); k++) {
+					char alphChar = alphabetList.get(k);   //A
+					//System.out.println("Alphabet letter: " + alphChar);
+					if(alphChar == hintChar) {
+						//System.out.println("YES!");
+						//if the hintchar is not in the alphabet
+						if(alphabetList.contains(hintChar)) {
+							//System.out.println("MORE YES");
+							newAlphabet.add(hintChar);
+						}
+					}
+				}
+			}
+			alphabetList = newAlphabet;
+		}
+
+		String returnstring = "";
+		for (int j = 0; j < alphabetList.size(); j++) {
+			//System.out.println(alphabetList.get(j));
+			returnstring = returnstring +alphabetList.get(j);
+		}
+		//System.out.println(returnstring);
+		char[] returnCharArray =returnstring.toCharArray();
+		return returnCharArray;
+
 	}
 
 	// Generating all possible strings of length k
