@@ -159,37 +159,44 @@ public class Master extends AbstractLoggingActor {
 		for (String[] messageLine : message.getLines()) {
 			//System.out.println(Arrays.toString(messageLine)); //Print message
 			//System.out.println(messageLine[4]);
-			int fileIndex = Integer.parseInt(messageLine[0]);
-			passwordHints = new String[messageLine.length-4];
-			for (int i = 4; i < messageLine.length; i++) {
-				passwordHints[i-4] = messageLine[i];
+			int ID = Integer.parseInt(messageLine[0]);
+
+			passwordHints = new String[messageLine.length-5];
+			for (int i = 5; i < messageLine.length; i++) {
+				passwordHints[i-5] = messageLine[i];
 			}
-			Password password = new Password(fileIndex, messageLine[1], messageLine[4], passwordHints, this.charactersInPassword);
+			Password password = new Password(ID, messageLine[1], messageLine[4], passwordHints, this.charactersInPassword);
+			System.out.println("Password: " + password.toString());
 			//System.out.println(password);
 			ID_PasswordHashMap.put(password.getID(), password); //adding password to hashmap
 			for (int i = 0; i < password.getHintsEncryptedArray().length; i++) {
 				for (int j = 0; j < this.possibleCombinationsForHintsList.size(); j++) {
-					//add to queue
+					//add to hintCrackingQueue
 					this.hintCrackingQueue.add(new DecryptHintMessage(password.getID(), password.getHintsEncryptedArray()[i], this.possibleCombinationsForHintsList.get(j)));//Add hint cracking task to hintCrackingQueue
 				}
 			}
-
-			if(this.passwordCrackingQueue.isEmpty()){ //If there are no elements in passwordCrackingQueue
-				this.sendDecryptHintMessage(); //9.Send messages from hintCrackingQueue to Workers that are free (workerOccupied)
-			}
-			else { //If there are elements in passwordCrackingQueue
-				//send decrypt password
-				sendDecryptPasswordMessage();
-			}
-			//System.out.println("hintCrackingQueue length: " + hintCrackingQueue.size());
-
 		}
+
+		System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
+		System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
+
+		if(this.passwordCrackingQueue.isEmpty()){ //If there are no elements in passwordCrackingQueue
+			this.sendDecryptHintMessage(); //9.Send messages from hintCrackingQueue to Workers that are free (workerOccupied)
+		}
+		else { //If there are elements in passwordCrackingQueue
+			//send decrypt password
+			sendDecryptPasswordMessage();
+		}
+		//System.out.println("hintCrackingQueue length: " + hintCrackingQueue.size());
+
 		//System.out.println(passwordFileIndexHashMap.size());
 		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
 	}
 
 	protected void sendDecryptHintMessage(){
+		System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
+		System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
 		for (int i = 0; i < workerOccupied.size(); i++) {
 			if (this.workerOccupied.get(i)==false){
 				try {
@@ -200,8 +207,10 @@ public class Master extends AbstractLoggingActor {
 			}
 		}
 	}
-	//hacer para decrypt password
+
 	protected void sendDecryptPasswordMessage(){
+		System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
+		System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
 		for (int i = 0; i < workerOccupied.size(); i++) {
 			if (this.workerOccupied.get(i)==false){
 				try {
@@ -218,7 +227,7 @@ public class Master extends AbstractLoggingActor {
 		ActorRef messageSender = this.sender();
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
-				System.out.println("Worker is available");
+				//System.out.println("Worker is available");
 				this.workerOccupied.set(i, false); //Set available
 				sendDecryptPasswordMessage();
 				sendDecryptHintMessage();
@@ -234,14 +243,15 @@ public class Master extends AbstractLoggingActor {
 		String encrypted = message.getEncryptedHint();
 		String decrypted = message.getDecryptedHint();
 		ActorRef messageSender = this.sender();
-		System.out.println("DecryptedHint message received!!");
+		//System.out.println("DecryptedHint message received!!");
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
-				System.out.println("Worker is available");
 				this.workerOccupied.set(i, false); //Set available
 				if(this.ID_PasswordHashMap.containsKey(ID)){
-
-					this.ID_PasswordHashMap.get(ID).addDecryptedHint(decrypted, encrypted);
+					this.ID_PasswordHashMap.get(ID).addDecryptedHint(encrypted, decrypted);
+					//System.out.println(this.ID_PasswordHashMap.get(ID).toString());
+					System.out.println(this.ID_PasswordHashMap.get(ID).toString());
+					//this.log().info("Saved hint for " + this.ID_PasswordHashMap.get(ID).getName() + " with ID: " + this.ID_PasswordHashMap.get(ID).getID() + "\n" + "		Hints Array: " + this.ID_PasswordHashMap.get(ID).getDecryptedPassword().toString());
 				}
 			}
 		}

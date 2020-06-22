@@ -36,7 +36,6 @@ public class Worker extends AbstractLoggingActor {
 
 	public Worker() {
 		this.cluster = Cluster.get(this.context().system());
-		this.hintHashmap = new HashMap<>();
 	}
 	
 	////////////////////
@@ -64,8 +63,7 @@ public class Worker extends AbstractLoggingActor {
 	private ActorRef master;
 	private String hint;
 	private int ID;
-	private HashMap<String, Integer> hintHashmap;
-	
+
 	/////////////////////
 	// Actor Lifecycle //
 	/////////////////////
@@ -130,21 +128,14 @@ public class Worker extends AbstractLoggingActor {
 		this.ID = message.getID();
 		this.hint = message.getHint();
 
-		this.hintHashmap.put(message.getHint(), message.getID());
-
-
 		this.log().info("Started decrypting hint");
 
-		System.out.println(this.hint);
-		//System.out.println(this.hintHashmap.get(message.getHint()));
-
+		//System.out.println(this.hint);
 
 		List<String> allPermutations = new ArrayList<>(); //Not needed unless we want to see permutations checked
 		heapPermutation(message.getHintCharacterCombination(), message.getHintCharacterCombination().length, allPermutations);
 
-		//TODO Send message with available status!!!!
-
-		this.master.tell(new WorkerAvailableMessage(), this.self());
+		this.master.tell(new WorkerAvailableMessage(), this.self()); //tell master it is free
 
 		//here
 		//System.out.println(this.hint);
@@ -219,6 +210,14 @@ public class Worker extends AbstractLoggingActor {
 	public static void possibleStrings(int maxLength, Character[] alphabet, String curr) {
 
 		// If the current string has reached it's maximum length
+		//For Tanja: you can get ID through:
+		//int ID = message.getPassword().getID(); //Fields are obtained in this way
+		//Or password through:
+		//String decryptedPassword = message.getPassword().getDecryptedPassword(); //this is the one we should change
+		//String encryptedPassword = message.getPassword().getEncryptedPassword(); //this is the hashed one we should crack
+		//But everrything should go in : private void handle(Master.DecryptPassword message) function
+		//And the available fields are in the Password class at the end of the Master
+
 		String password = "ABC"; //TODO: there would be the real password
 		if(curr.length() == maxLength) {
 			if (curr.equals(password)){
@@ -265,8 +264,7 @@ public class Worker extends AbstractLoggingActor {
 			//Hash permutation
 			String permutationHash = hash(new String(a));
 			if(this.hint.equals(permutationHash)){
-				System.out.println("Hint Decrypted!!!");
-				//todo: send cracked message!!
+				this.log().info("Hint decrypted");
 				this.master.tell(new DecryptedHint(this.ID, this.hint, new String(a)), this.self());
 			}
 
