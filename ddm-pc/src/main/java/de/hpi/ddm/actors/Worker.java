@@ -45,10 +45,9 @@ public class Worker extends AbstractLoggingActor {
 	// Actor Messages //
 	////////////////////
 
-	@Data
-	@NoArgsConstructor
+
 	@AllArgsConstructor
-	public static class WorkerAvailableMessage implements Serializable{}
+	public static class WorkerAvailableMessageToMaster implements Serializable{}
 
 	@Data
 	@AllArgsConstructor @NoArgsConstructor
@@ -151,7 +150,7 @@ public class Worker extends AbstractLoggingActor {
 		heapPermutation(message.getHintCharacterCombination(), message.getHintCharacterCombination().length, allPermutations);
 		//this.log().info("Size of permutations tried: " + allPermutations.size());
 
-		this.master.tell(new WorkerAvailableMessage(), this.self()); //tell master it is free
+		this.master.tell(new WorkerAvailableMessageToMaster(), this.self()); //tell master it is free
 
 		//here
 		//System.out.println(this.hint);

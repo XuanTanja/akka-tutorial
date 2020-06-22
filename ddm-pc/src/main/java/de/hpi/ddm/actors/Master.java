@@ -117,7 +117,7 @@ public class Master extends AbstractLoggingActor {
 				.match(BatchMessage.class, this::handle)
 				.match(Worker.DecryptedHint.class, this::handle)
 				.match(Worker.PasswordCompleteMessage.class, this::handle)
-				.match(Worker.WorkerAvailableMessage.class, this::handle)
+				.match(Worker.WorkerAvailableMessageToMaster.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
@@ -233,13 +233,14 @@ public class Master extends AbstractLoggingActor {
 					GoCrackPasswordMessage messageToSend = this.passwordCrackingQueue.remove(); //.poll para ver si tiene elemento primero
 					this.workers.get(i).tell(messageToSend, this.self());
 					this.workerOccupied.set(i, true); //Set occupied
+					this.log().info("PasswordCracking message sent to worker");
 				}catch (NoSuchElementException e){};
 
 			}
 		}
 	}
 
-	private void handle(Worker.WorkerAvailableMessage workerAvailableMessage) {
+	private void handle(Worker.WorkerAvailableMessageToMaster workerAvailableMessageToMaster) {
 		ActorRef messageSender = this.sender();
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
@@ -282,7 +283,8 @@ public class Master extends AbstractLoggingActor {
 			//send decrypt password message to worker!
 			Password password = (Password) ID_PasswordHashMap.get(ID).clone(); //clone the password from hashmap to send to the worker
 			this.passwordCrackingQueue.add(new GoCrackPasswordMessage(password));
-			this.log().info("Added Password Cracking work. PW_Cracking queue size: " + this.ID_PasswordHashMap.get(ID).toString());
+			this.log().info("Added Password Cracking work for ID" + ID + " with Password object: " + this.ID_PasswordHashMap.get(ID).toString());
+			this.log().info("PasswordCrackingQueue size: " + this.passwordCrackingQueue.size());
 			sendDecryptPasswordMessage(); //12. send password cracking
 			sendDecryptHintMessage();
 		}
