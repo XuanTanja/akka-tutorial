@@ -19,6 +19,7 @@ import akka.cluster.MemberStatus;
 import de.hpi.ddm.MasterSystem;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 public class Worker extends AbstractLoggingActor {
 
@@ -44,11 +45,13 @@ public class Worker extends AbstractLoggingActor {
 	// Actor Messages //
 	////////////////////
 
-
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
 	public static class WorkerAvailableMessage implements Serializable{}
 
 	@Data
-	@AllArgsConstructor
+	@AllArgsConstructor @NoArgsConstructor
 	public static class DecryptedHint implements Serializable {
 		private int ID;
 		private String encryptedHint;
@@ -56,7 +59,7 @@ public class Worker extends AbstractLoggingActor {
 	}
 
 	@Data
-	@AllArgsConstructor
+	@AllArgsConstructor @NoArgsConstructor
 	public static class PasswordCompleteMessage implements Serializable {
 		private int ID;
 		private String encryptedPassword;

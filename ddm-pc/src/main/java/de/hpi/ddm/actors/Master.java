@@ -60,7 +60,7 @@ public class Master extends AbstractLoggingActor {
 	// Actor Messages //
 	////////////////////
 
-	@Data
+	@Data @NoArgsConstructor
 	public static class StartMessage implements Serializable {
 		private static final long serialVersionUID = -50374816448627600L;
 	}
@@ -71,25 +71,25 @@ public class Master extends AbstractLoggingActor {
 		private List<String[]> lines;
 	}
 
-	@Data
+	@Data @NoArgsConstructor
 	public static class RegistrationMessage implements Serializable {
 		private static final long serialVersionUID = 3303081601659723997L;
 	}
 
-	@Getter @Setter @ToString @AllArgsConstructor
+	@Getter @Setter @ToString @AllArgsConstructor @NoArgsConstructor
 	public static class DecryptHintMessage implements Serializable {
 		private int ID;
 		private String hint;
 		private char[] hintCharacterCombination; //possible characters in the hint
 	}
 
-	@Getter @Setter @ToString @AllArgsConstructor
+	@Getter @Setter @ToString @AllArgsConstructor @NoArgsConstructor
 	public static class GoCrackPasswordMessage implements Serializable {
 		//Maybe just send the object?
 		Password password;
 	}
 
-	@Getter @Setter @ToString @AllArgsConstructor
+	@Getter @Setter @ToString @AllArgsConstructor @NoArgsConstructor
 	public static class PasswordCompleteMessage implements Serializable {
 		private int ID;
 		private String crackedPassword;
@@ -166,7 +166,7 @@ public class Master extends AbstractLoggingActor {
 				passwordHints[i-5] = messageLine[i];
 			}
 			Password password = new Password(ID, messageLine[1], messageLine[4], passwordHints, this.charactersInPassword, this.passwordLength);
-			System.out.println("Password: " + password.toString());
+			this.log().info("DEBUG: Password: " + password);
 			//System.out.println(password);
 			ID_PasswordHashMap.put(password.getID(), password); //adding password to hashmap
 			for (int i = 0; i < password.getHintsEncryptedArray().length; i++) {
@@ -177,22 +177,38 @@ public class Master extends AbstractLoggingActor {
 			}
 		}
 
-		//System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
-		//System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
+		this.log().info("DEBUG: hintCrackingQueue size: " + hintCrackingQueue.size());
+		this.log().info("DEBUG passwordCrackingQueue size: " + passwordCrackingQueue.size());
 
 		if(this.passwordCrackingQueue.isEmpty()){ //If there are no elements in passwordCrackingQueue
 			this.sendDecryptHintMessage(); //9.Send messages from hintCrackingQueue to Workers that are free (workerOccupied)
 		}
 		else { //If there are elements in passwordCrackingQueue
-			//send decrypt password
-			sendDecryptPasswordMessage();
+			sendDecryptPasswordMessage(); //send decrypt password
 		}
+
 		//System.out.println("hintCrackingQueue length: " + hintCrackingQueue.size());
 
-		//System.out.println(passwordFileIndexHashMap.size());
-		
+
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
+		this.collector.tell(new Collector.PrintMessage(), this.self());
+
+		//check if workers are free and there is no more tasks in both queues -> (this means we need to terminate the program)
+		if(allWorkersAreFree() && (passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty())){
+			terminate(); //Terminate program since there is no more work in queues and workers aren't computing anything
+		}
+
 	}
+
+	protected boolean allWorkersAreFree(){
+		for(int i = 0; i < this.workerOccupied.size(); i++) {
+			if(this.workerOccupied.get(i) == false){
+				return false;
+			}
+		}
+		return true;
+	}
+
 
 	protected void sendDecryptHintMessage(){
 		//System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
@@ -243,31 +259,44 @@ public class Master extends AbstractLoggingActor {
 		String encrypted = message.getEncryptedHint();
 		String decrypted = message.getDecryptedHint();
 		ActorRef messageSender = this.sender();
-		this.log().info("ID: " + ID + " | decrypted: " + decrypted);
+		this.log().info("Password hint decrypted from ID: " + ID + " | decrypted hint: " + decrypted);
 		//System.out.println("DecryptedHint message received!!");
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
-				this.workerOccupied.set(i, false); //Set available
 				if(this.ID_PasswordHashMap.containsKey(ID)){
-					this.log().info("Added hint to hashmap");
+					this.log().info("Added hint to hashmap with key " + ID);
 					this.ID_PasswordHashMap.get(ID).addDecryptedHint(encrypted, decrypted);
 					//System.out.println(this.ID_PasswordHashMap.get(ID).toString());
-					System.out.println(this.ID_PasswordHashMap.get(ID).toString());
+					//System.out.println(this.ID_PasswordHashMap.get(ID).toString());
+					this.log().info("Password object: " + this.ID_PasswordHashMap.get(ID).toString());
 					//this.log().info("Saved hint for " + this.ID_PasswordHashMap.get(ID).getName() + " with ID: " + this.ID_PasswordHashMap.get(ID).getID() + "\n" + "		Hints Array: " + this.ID_PasswordHashMap.get(ID).getDecryptedPassword().toString());
+					break;
 				}
+				this.workerOccupied.set(i, false); //Set available
 			}
 		}
+
 		//check if all hints from ID are cracked
 		boolean bool = this.ID_PasswordHashMap.get(ID).checkAllDecryptedHintsTrue();
 		if(bool == true){
 			//send decrypt password message to worker!
 			Password password = (Password) ID_PasswordHashMap.get(ID).clone(); //clone the password from hashmap to send to the worker
 			this.passwordCrackingQueue.add(new GoCrackPasswordMessage(password));
+			this.log().info("Added Password Cracking work. PW_Cracking queue size: " + this.ID_PasswordHashMap.get(ID).toString());
 			sendDecryptPasswordMessage(); //12. send password cracking
 			sendDecryptHintMessage();
 		}
 		else { //If not all hints are cracked
 			sendDecryptHintMessage();
+		}
+
+		//check if workers are free and there is no more tasks in both queues -> (this means we need to terminate the program)
+		if(passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty()){ //Check to see if there are more tasks in queues
+			this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of passwords
+		}
+
+		if(allWorkersAreFree() && (passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty())){
+			terminate(); //Terminate program since there is no more work in queues and workers aren't computing anything
 		}
 	}
 
@@ -298,18 +327,22 @@ public class Master extends AbstractLoggingActor {
 
 	private void handle(Worker.PasswordCompleteMessage message) {
 		int id = message.getID();
-
 		ActorRef messageSender = this.sender();
+		String decryptedPassword = message.getDecryptedPassword();
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
-				System.out.println("Worker is available");
-				this.workerOccupied.set(i, false); //Set available
 				if(this.ID_PasswordHashMap.containsKey(id)){
-					ID_PasswordHashMap.get(id).setDecryptedPassword(message.getDecryptedPassword());
+					ID_PasswordHashMap.get(id).setDecryptedPassword(decryptedPassword);
+					this.log().info("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + decryptedPassword);
 					//Send solution to the collector
-					this.collector.tell(new Collector.CollectMessage("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + ID_PasswordHashMap.get(id).getDecryptedPassword()), this.self());
+					this.collector.tell(new Collector.CollectMessage("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + decryptedPassword), this.self());
+					this.collector.tell(new Collector.PrintMessage(), this.self());
+					break;
 				}
+				//System.out.println("Worker is available");
+				this.workerOccupied.set(i, false); //Set available
 			}
+
 		}
 
 		sendDecryptPasswordMessage();
@@ -319,8 +352,11 @@ public class Master extends AbstractLoggingActor {
 			this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of passwords
 		}
 
-		//TODO: check if wokers are free and there is no more tasks in both queues -> (this means we need to terminate the program)
-		// terminate()
+		//check if workers are free and there is no more tasks in both queues -> (this means we need to terminate the program)
+		if(allWorkersAreFree() && (passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty())){
+			terminate(); //Terminate program since there is no more work in queues and workers aren't computing anything
+		}
+
 	}
 
 
@@ -363,7 +399,6 @@ public class Master extends AbstractLoggingActor {
 		private String decryptedPassword;
 		private String[] hintsEncryptedArray;
 		private String[] hintsDecryptedArray;
-		private boolean crackedPassword;
 		private char[] possibleCharacters;
 
 		public Password(int ID, String name, String encryptedPassword, String[] hintsEncryptedArray, char[] alphabet, int pwLength){
@@ -374,7 +409,6 @@ public class Master extends AbstractLoggingActor {
 			this.hintsEncryptedArray = hintsEncryptedArray.clone();
 			this.hintsDecryptedArray = new String[this.hintsEncryptedArray.length];
 			Arrays.fill(this.hintsDecryptedArray, "");
-			this.crackedPassword = false;
 			this.possibleCharacters = alphabet;
 			this.passwordLength = pwLength;
 		}
