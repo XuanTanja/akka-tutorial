@@ -176,8 +176,8 @@ public class Master extends AbstractLoggingActor {
 			}
 		}
 
-		System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
-		System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
+		//System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
+		//System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
 
 		if(this.passwordCrackingQueue.isEmpty()){ //If there are no elements in passwordCrackingQueue
 			this.sendDecryptHintMessage(); //9.Send messages from hintCrackingQueue to Workers that are free (workerOccupied)
@@ -194,8 +194,8 @@ public class Master extends AbstractLoggingActor {
 	}
 
 	protected void sendDecryptHintMessage(){
-		System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
-		System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
+		//System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
+		//System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
 		for (int i = 0; i < workerOccupied.size(); i++) {
 			if (this.workerOccupied.get(i)==false){
 				try {
@@ -208,8 +208,8 @@ public class Master extends AbstractLoggingActor {
 	}
 
 	protected void sendDecryptPasswordMessage(){
-		System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
-		System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
+		//System.out.println("hintCrackingQueue size: " + hintCrackingQueue.size());
+		//System.out.println("passwordCrackingQueue size: " + passwordCrackingQueue.size());
 		for (int i = 0; i < workerOccupied.size(); i++) {
 			if (this.workerOccupied.get(i)==false){
 				try {

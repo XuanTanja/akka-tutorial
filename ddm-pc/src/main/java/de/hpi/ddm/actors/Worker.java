@@ -147,7 +147,7 @@ public class Worker extends AbstractLoggingActor {
 		List<String> allPermutations = new ArrayList<>(); //Not needed unless we want to see permutations checked
 		this.stop = false;
 		heapPermutation(message.getHintCharacterCombination(), message.getHintCharacterCombination().length, allPermutations);
-		this.log().info("Size of permutations tried: " + allPermutations.size());
+		//this.log().info("Size of permutations tried: " + allPermutations.size());
 
 		this.master.tell(new WorkerAvailableMessage(), this.self()); //tell master it is free
 
@@ -163,35 +163,45 @@ public class Worker extends AbstractLoggingActor {
 
 
 		String encrypted = message.getPassword().getEncryptedPassword(); //This we should change
-		System.out.println("decryptedPassword: " + decryptedPassword);
+		System.out.println("encryptedPassword: " + encrypted);
 		//String decryptedPassword =  message.getPassword().setDecryptedPassword("");
 		//Send ID and decrypted password back to master (new message)
 
 		//String[] hints = message.getPassword().getHintsDecryptedArray().clone();
 		String[] hints = message.getPassword().getHintsDecryptedArray();
+		/*
+		System.out.println();
 		System.out.println("hints: " );
 		for (int i = 0; i < hints.length; i++) {
-			System.out.print(hints[i]);
+			System.out.print(hints[i] + " ");
 		}
-		//hints: [ABCDEF], [ACDEFG],...
-
-		//char [] alphabet = message.getPassword().getPossibleCharacters();
+		 */
 		char[] alphabet = message.getPassword().getPossibleCharacters();
+		/*
+		System.out.println();
 		System.out.println("Alphabet: " );
 		for (int i = 0; i < alphabet.length; i++) {
 			System.out.print(alphabet[i]);
 		}
-		//alphabet = [A], [B], [C], ...
+		 */
 
 		List<Character> hintCharList = getMissingCharactersofHint(hints, alphabet);
 		Character[] hintCharArray = hintCharList.toArray(new Character[hintCharList.size()]);
+		/*
+		System.out.println();
+		System.out.println("hintCharArray: " );
+		for (int i = 0; i < hintCharArray.length; i++) {
+			System.out.print(hintCharArray[i]);
+		}
+		 */
 
 		possibleStrings(message.getPassword().getPossibleCharacters().length, hintCharArray, "", encrypted);
 		if(!this.decryptedPassword.equals("")){
 			//tell  master
 			this.master.tell(new DecryptedPassword(ID, encrypted, this.decryptedPassword), this.self());
-			System.out.println("Password: " + this.decryptedPassword);
+			//System.out.println("Password: " + this.decryptedPassword);
 		}
+		//System.out.println("decryptedPassword: " + decryptedPassword);
 		//Here hash each combination and test if it equals the encrypted password
 
 
@@ -212,12 +222,14 @@ public class Worker extends AbstractLoggingActor {
 					}
 				}
 			}
+			//System.out.println("Hint List*: " + hintList);
 		}
 
 
 		Iterator<Character> itr = hintchars.iterator();
 		while (itr.hasNext()) {
 			char element = itr.next();
+			//System.out.println("element: " + element);
 			for (int m = 0; m < alphabet.length; m++) {
 				if (element == alphabet[m]) {
 					alphabet[m] = 0;
@@ -227,8 +239,9 @@ public class Worker extends AbstractLoggingActor {
 
 		List<Character> hintcharsFound = new ArrayList<Character>();
 		for (int n = 0; n < alphabet.length; n++) {
-			if (alphabet[n] != 0) {
+			if (alphabet[n] != 0) { //Problem doesnt go in
 				hintcharsFound.add(alphabet[n]);
+				//System.out.println("hintcharsFound size*: " + hintcharsFound.size());
 			}
 		}
 
@@ -236,17 +249,6 @@ public class Worker extends AbstractLoggingActor {
 	}
 
 	public void possibleStrings(int maxLength, Character[] alphabet, String curr, String encrypted) {
-
-		// If the current string has reached it's maximum length
-		//For Tanja: you can get ID through:
-		//int ID = message.getPassword().getID(); //Fields are obtained in this way
-		//Or password through:
-		//String decryptedPassword = message.getPassword().getDecryptedPassword(); //this is the one we should change
-		//String encryptedPassword = message.getPassword().getEncryptedPassword(); //this is the hashed one we should crack
-		//But everrything should go in : private void handle(Master.DecryptPassword message) function
-		//And the available fields are in the Password class at the end of the Master
-
-		//String password = "ABC"; //TODO: there would be the real password
 		String password = encrypted;
 
 
