@@ -25,7 +25,7 @@ public class Master extends AbstractLoggingActor {
 
 	//http://tutorials.jenkov.com/java-collections/queue.html
 	private Queue<DecryptHintMessage> hintCrackingQueue;
-	private  Queue<DecryptPassword> passwordCrackingQueue;
+	private  Queue<GoCrackPasswordMessage> passwordCrackingQueue;
 
 	//Actor references
 	private final ActorRef reader;
@@ -53,7 +53,7 @@ public class Master extends AbstractLoggingActor {
 		this.ID_PasswordHashMap = new HashMap<Integer, Password>();
 
 		this.hintCrackingQueue = new LinkedList<DecryptHintMessage>();
-		this.passwordCrackingQueue = new LinkedList<DecryptPassword>();
+		this.passwordCrackingQueue = new LinkedList<GoCrackPasswordMessage>();
 	}
 
 	////////////////////
@@ -84,17 +84,16 @@ public class Master extends AbstractLoggingActor {
 	}
 
 	@Getter @Setter @ToString @AllArgsConstructor
-	public static class DecryptPassword implements Serializable {
+	public static class GoCrackPasswordMessage implements Serializable {
 		//Maybe just send the object?
 		Password password;
-		/*
+	}
+
+	@Getter @Setter @ToString @AllArgsConstructor
+	public static class PasswordCompleteMessage implements Serializable {
 		private int ID;
-		private String password;
-		private String[] hints;
-		private char[] hintCharacterCombination; //possible characters in the hint
-		private boolean messageAlreadySentToWorker = false;
-		private int length;
-		 */
+		private String crackedPassword;
+		private String encryptedPassword;
 	}
 	
 	/////////////////////
@@ -117,12 +116,14 @@ public class Master extends AbstractLoggingActor {
 				.match(StartMessage.class, this::handle)
 				.match(BatchMessage.class, this::handle)
 				.match(Worker.DecryptedHint.class, this::handle)
-				.match(Worker.DecryptedPassword.class, this::handle)
+				.match(Worker.PasswordCompleteMessage.class, this::handle)
 				.match(Worker.WorkerAvailableMessage.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
+
+
 
 
 	protected void handle(StartMessage message) {
@@ -213,7 +214,7 @@ public class Master extends AbstractLoggingActor {
 		for (int i = 0; i < workerOccupied.size(); i++) {
 			if (this.workerOccupied.get(i)==false){
 				try {
-					DecryptPassword messageToSend = this.passwordCrackingQueue.remove(); //.poll para ver si tiene elemento primero
+					GoCrackPasswordMessage messageToSend = this.passwordCrackingQueue.remove(); //.poll para ver si tiene elemento primero
 					this.workers.get(i).tell(messageToSend, this.self());
 					this.workerOccupied.set(i, true); //Set occupied
 				}catch (NoSuchElementException e){};
@@ -261,7 +262,7 @@ public class Master extends AbstractLoggingActor {
 		if(bool == true){
 			//send decrypt password message to worker!
 			Password password = (Password) ID_PasswordHashMap.get(ID).clone(); //clone the password from hashmap to send to the worker
-			this.passwordCrackingQueue.add(new DecryptPassword(password));
+			this.passwordCrackingQueue.add(new GoCrackPasswordMessage(password));
 			sendDecryptPasswordMessage(); //12. send password cracking
 			sendDecryptHintMessage();
 		}
@@ -295,7 +296,7 @@ public class Master extends AbstractLoggingActor {
 	}
 
 
-	private void handle(Worker.DecryptedPassword message) {
+	private void handle(Worker.PasswordCompleteMessage message) {
 		int id = message.getID();
 
 		ActorRef messageSender = this.sender();
@@ -317,8 +318,10 @@ public class Master extends AbstractLoggingActor {
 		if(passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty()){ //Check to see if there are more tasks in queues
 			this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of passwords
 		}
-	}
 
+		//TODO: check if wokers are free and there is no more tasks in both queues -> (this means we need to terminate the program)
+		// terminate()
+	}
 
 
 	

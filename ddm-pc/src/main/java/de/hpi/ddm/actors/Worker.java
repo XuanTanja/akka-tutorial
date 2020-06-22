@@ -10,7 +10,6 @@ import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
 import akka.actor.PoisonPill;
 import akka.actor.Props;
-import akka.actor.dsl.Creators;
 import akka.cluster.Cluster;
 import akka.cluster.ClusterEvent.CurrentClusterState;
 import akka.cluster.ClusterEvent.MemberRemoved;
@@ -20,7 +19,6 @@ import akka.cluster.MemberStatus;
 import de.hpi.ddm.MasterSystem;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 public class Worker extends AbstractLoggingActor {
 
@@ -59,7 +57,7 @@ public class Worker extends AbstractLoggingActor {
 
 	@Data
 	@AllArgsConstructor
-	public static class DecryptedPassword implements Serializable {
+	public static class PasswordCompleteMessage implements Serializable {
 		private int ID;
 		private String encryptedPassword;
 		private String decryptedPassword;
@@ -103,7 +101,7 @@ public class Worker extends AbstractLoggingActor {
 				.match(MemberUp.class, this::handle)
 				.match(MemberRemoved.class, this::handle)
 				.match(Master.DecryptHintMessage.class, this::handle)
-				.match(Master.DecryptPassword.class, this::handle)
+				.match(Master.GoCrackPasswordMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
@@ -156,7 +154,7 @@ public class Worker extends AbstractLoggingActor {
 		//System.out.println(hash(new String(message.getHintCharacterCombination())));
 	}
 
-	private void handle(Master.DecryptPassword message) { //13. Here worker receives a password to crack
+	private void handle(Master.GoCrackPasswordMessage message) { //13. Here worker receives a password to crack
 		//see how to get characters from the hints!
 		//Master should send all hints (so the password object) through here so the worker can work on the password
 		int ID = message.getPassword().getID(); //Fields are obtained in this way
@@ -198,7 +196,7 @@ public class Worker extends AbstractLoggingActor {
 		possibleStrings(message.getPassword().getPossibleCharacters().length, hintCharArray, "", encrypted);
 		if(!this.decryptedPassword.equals("")){
 			//tell  master
-			this.master.tell(new DecryptedPassword(ID, encrypted, this.decryptedPassword), this.self());
+			this.master.tell(new PasswordCompleteMessage(ID, encrypted, this.decryptedPassword), this.self());
 			//System.out.println("Password: " + this.decryptedPassword);
 		}
 		//System.out.println("decryptedPassword: " + decryptedPassword);
