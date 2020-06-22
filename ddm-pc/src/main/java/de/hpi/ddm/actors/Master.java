@@ -164,7 +164,7 @@ public class Master extends AbstractLoggingActor {
 			for (int i = 5; i < messageLine.length; i++) {
 				passwordHints[i-5] = messageLine[i];
 			}
-			Password password = new Password(ID, messageLine[1], messageLine[4], passwordHints, this.charactersInPassword);
+			Password password = new Password(ID, messageLine[1], messageLine[4], passwordHints, this.charactersInPassword, this.passwordLength);
 			System.out.println("Password: " + password.toString());
 			//System.out.println(password);
 			ID_PasswordHashMap.put(password.getID(), password); //adding password to hashmap
@@ -355,6 +355,7 @@ public class Master extends AbstractLoggingActor {
 	protected class Password implements Serializable, Cloneable{
 		private int ID;
 		private String name;
+		private int passwordLength;
 		private String encryptedPassword;
 		private String decryptedPassword;
 		private String[] hintsEncryptedArray;
@@ -362,7 +363,7 @@ public class Master extends AbstractLoggingActor {
 		private boolean crackedPassword;
 		private char[] possibleCharacters;
 
-		public Password(int ID, String name, String encryptedPassword, String[] hintsEncryptedArray, char[] alphabet){
+		public Password(int ID, String name, String encryptedPassword, String[] hintsEncryptedArray, char[] alphabet, int pwLength){
 			this.ID = ID;
 			this.name = name;
 			this.encryptedPassword = encryptedPassword;
@@ -372,6 +373,7 @@ public class Master extends AbstractLoggingActor {
 			Arrays.fill(this.hintsDecryptedArray, "");
 			this.crackedPassword = false;
 			this.possibleCharacters = alphabet;
+			this.passwordLength = pwLength;
 		}
 
 		public Object clone(){
