@@ -160,11 +160,11 @@ public class Worker extends AbstractLoggingActor {
 	private void handle(Master.GoCrackPasswordMessage message) { //13. Here worker receives a password to crack
 		//see how to get characters from the hints!
 		//Master should send all hints (so the password object) through here so the worker can work on the password
-		int ID = message.getPassword().getID(); //Fields are obtained in this way
+		this.ID = message.getPassword().getID(); //Fields are obtained in this way
 
 
 		String encrypted = message.getPassword().getEncryptedPassword(); //This we should change
-		System.out.println("encryptedPassword: " + encrypted);
+		//System.out.println("encryptedPassword: " + encrypted);
 
 
 		String[] hints = message.getPassword().getHintsDecryptedArray().clone();
@@ -177,18 +177,11 @@ public class Worker extends AbstractLoggingActor {
 
 		printAllKLengthRec(set, "", n,k,encrypted);
 		if(!this.decryptedPassword.equals("")) {
-			//return password in password message and tell  master
-			//this.master.tell(new PasswordCompleteMessage(possiblePasswords.get(message.getPassword().setCrackedPassword())), this.self());
-			//Master.PasswordCompleteMessage msg = new Master.PasswordCompleteMessage();
-			//msg.setResult(possiblePasswords.get(message.password));
-			//this.sender().tell(msg, this.self());
-			//System.out.println("Password: " + this.decryptedPassword);
-
-			this.master.tell(new PasswordCompleteMessage(ID, encrypted, this.decryptedPassword), this.self());
+			this.master.tell(new PasswordCompleteMessage(this.ID, encrypted, this.decryptedPassword), this.self());
 			return;
 		}
-		System.out.println("No password found!");
-
+		this.log().info("No password found");
+		this.master.tell(new PasswordCompleteMessage(this.ID, encrypted, this.decryptedPassword), this.self());
 	}
 
 	private char[] getMissingCharactersofHint (String[] hints, char[] alphabet){
@@ -247,10 +240,10 @@ public class Worker extends AbstractLoggingActor {
 		{
 			String curr_hashed = hash(prefix);
 			if (curr_hashed.equals(password)){
-				System.out.println("***Password found!");
 				this.decryptedPassword = prefix;
-
-			}			return;
+				this.log().info("Found password for ID  " + this.ID + ": " + this.decryptedPassword);
+			}
+			return;
 		}
 
 		// One by one add all characters

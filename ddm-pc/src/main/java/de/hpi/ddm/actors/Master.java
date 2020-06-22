@@ -166,7 +166,7 @@ public class Master extends AbstractLoggingActor {
 				passwordHints[i-5] = messageLine[i];
 			}
 			Password password = new Password(ID, messageLine[1], messageLine[4], passwordHints, this.charactersInPassword, this.passwordLength);
-			this.log().info("DEBUG: Password: " + password);
+			//this.log().info("DEBUG: Password: " + password);
 			//System.out.println(password);
 			ID_PasswordHashMap.put(password.getID(), password); //adding password to hashmap
 			for (int i = 0; i < password.getHintsEncryptedArray().length; i++) {
@@ -177,8 +177,8 @@ public class Master extends AbstractLoggingActor {
 			}
 		}
 
-		this.log().info("DEBUG: hintCrackingQueue size: " + hintCrackingQueue.size());
-		this.log().info("DEBUG passwordCrackingQueue size: " + passwordCrackingQueue.size());
+		//this.log().info("DEBUG: hintCrackingQueue size: " + hintCrackingQueue.size());
+		//this.log().info("DEBUG passwordCrackingQueue size: " + passwordCrackingQueue.size());
 
 		if(this.passwordCrackingQueue.isEmpty()){ //If there are no elements in passwordCrackingQueue
 			this.sendDecryptHintMessage(); //9.Send messages from hintCrackingQueue to Workers that are free (workerOccupied)
@@ -192,11 +192,6 @@ public class Master extends AbstractLoggingActor {
 
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
 		this.collector.tell(new Collector.PrintMessage(), this.self());
-
-		//check if workers are free and there is no more tasks in both queues -> (this means we need to terminate the program)
-		if(allWorkersAreFree() && (passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty())){
-			terminate(); //Terminate program since there is no more work in queues and workers aren't computing anything
-		}
 
 	}
 
@@ -297,9 +292,7 @@ public class Master extends AbstractLoggingActor {
 			this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of passwords
 		}
 
-		if(allWorkersAreFree() && (passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty())){
-			terminate(); //Terminate program since there is no more work in queues and workers aren't computing anything
-		}
+
 	}
 
 	
@@ -311,7 +304,11 @@ public class Master extends AbstractLoggingActor {
 			this.context().unwatch(worker);
 			worker.tell(PoisonPill.getInstance(), ActorRef.noSender());
 		}
-		
+
+		//Send all the password objects to the collector inside of the hashmap
+		this.collector.tell(new Collector.CollectMessage("Password hashmap: " + ID_PasswordHashMap.toString()), this.self());
+		this.collector.tell(new Collector.PrintMessage(), this.self());
+
 		this.self().tell(PoisonPill.getInstance(), ActorRef.noSender());
 		
 		long executionTime = System.currentTimeMillis() - this.startTime;
@@ -334,12 +331,14 @@ public class Master extends AbstractLoggingActor {
 		for (int i = 0; i < workers.size(); i++) {
 			if(messageSender.equals(workers.get(i))){
 				if(this.ID_PasswordHashMap.containsKey(id)){
-					ID_PasswordHashMap.get(id).setDecryptedPassword(decryptedPassword);
-					this.log().info("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + decryptedPassword);
-					//Send solution to the collector
-					this.collector.tell(new Collector.CollectMessage("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + decryptedPassword), this.self());
-					this.collector.tell(new Collector.PrintMessage(), this.self());
-					break;
+					if(!decryptedPassword.equals("")){
+						ID_PasswordHashMap.get(id).setDecryptedPassword(decryptedPassword);
+						this.log().info("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + decryptedPassword);
+						//Send solution to the collector
+						this.collector.tell(new Collector.CollectMessage("Decrypted Password from " + ID_PasswordHashMap.get(id).getName() + " with ID " + ID_PasswordHashMap.get(id).getID() + ": " + decryptedPassword), this.self());
+						this.collector.tell(new Collector.PrintMessage(), this.self());
+						break;
+					}
 				}
 				//System.out.println("Worker is available");
 				this.workerOccupied.set(i, false); //Set available
@@ -352,11 +351,6 @@ public class Master extends AbstractLoggingActor {
 
 		if(passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty()){ //Check to see if there are more tasks in queues
 			this.reader.tell(new Reader.ReadMessage(), this.self()); //tell reader to send more batches of passwords
-		}
-
-		//check if workers are free and there is no more tasks in both queues -> (this means we need to terminate the program)
-		if(allWorkersAreFree() && (passwordCrackingQueue.isEmpty() && hintCrackingQueue.isEmpty())){
-			terminate(); //Terminate program since there is no more work in queues and workers aren't computing anything
 		}
 
 	}
@@ -392,8 +386,10 @@ public class Master extends AbstractLoggingActor {
 
 
  	//https://projectlombok.org/features/Data
-	@Getter @Setter @ToString
-	protected class Password implements Serializable, Cloneable{
+	@Getter @Setter @ToString @NoArgsConstructor
+	//needs to be static to serialize with kryo
+	//we need it to have a @NoArgsConstructor to serialize
+	protected static class Password implements Serializable, Cloneable{
 		private int ID;
 		private String name;
 		private int passwordLength;
