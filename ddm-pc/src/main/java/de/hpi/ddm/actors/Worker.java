@@ -74,6 +74,7 @@ public class Worker extends AbstractLoggingActor {
 	private String hint;
 	private int ID;
 
+
 	/////////////////////
 	// Actor Lifecycle //
 	/////////////////////
@@ -162,119 +163,80 @@ public class Worker extends AbstractLoggingActor {
 
 		String encrypted = message.getPassword().getEncryptedPassword(); //This we should change
 		System.out.println("encryptedPassword: " + encrypted);
-		//String decryptedPassword =  message.getPassword().setDecryptedPassword("");
-		//Send ID and decrypted password back to master (new message)
 
-		//String[] hints = message.getPassword().getHintsDecryptedArray().clone();
+
 		String[] hints = message.getPassword().getHintsDecryptedArray();
-		/*
-		System.out.println();
-		System.out.println("hints: " );
-		for (int i = 0; i < hints.length; i++) {
-			System.out.print(hints[i] + " ");
-		}
-		 */
 		char[] alphabet = message.getPassword().getPossibleCharacters();
-		/*
-		System.out.println();
-		System.out.println("Alphabet: " );
-		for (int i = 0; i < alphabet.length; i++) {
-			System.out.print(alphabet[i]);
-		}
-		 */
 
-		List<Character> hintCharList = getMissingCharactersofHint(hints, alphabet);
-		Character[] hintCharArray = hintCharList.toArray(new Character[hintCharList.size()]);
-		/*
-		System.out.println();
-		System.out.println("hintCharArray: " );
-		for (int i = 0; i < hintCharArray.length; i++) {
-			System.out.print(hintCharArray[i]);
-		}
-		 */
 
-		possibleStrings(message.getPassword().getPossibleCharacters().length, hintCharArray, "", encrypted);
-		if(!this.decryptedPassword.equals("")){
-			//tell  master
-			this.master.tell(new PasswordCompleteMessage(ID, encrypted, this.decryptedPassword), this.self());
+		char[] set = getMissingCharactersofHint(hints, alphabet);
+		int k = message.getPassword().getPasswordLength();
+		int n = set.length;
+
+		printAllKLengthRec(set, "", n,k,encrypted);
+		if(!this.decryptedPassword.equals("")) {
+			//return password in password message and tell  master
+			//this.master.tell(new PasswordCompleteMessage(possiblePasswords.get(message.getPassword().setCrackedPassword())), this.self());
+			//Master.PasswordCompleteMessage msg = new Master.PasswordCompleteMessage();
+			//msg.setResult(possiblePasswords.get(message.password));
+			//this.sender().tell(msg, this.self());
 			//System.out.println("Password: " + this.decryptedPassword);
-		}
-		//System.out.println("decryptedPassword: " + decryptedPassword);
-		//Here hash each combination and test if it equals the encrypted password
 
+			this.master.tell(new PasswordCompleteMessage(ID, encrypted, this.decryptedPassword), this.self());
+			return;
+		}
+		System.out.println("No password found!");
 
 	}
 
-	private List<Character> getMissingCharactersofHint (String[] hints, char[] alphabet){
-		List<Character> hintchars = new ArrayList<Character>();
-		//iterate through hints and check if lettter is in alphabet and delete, for all hints
+	private char[] getMissingCharactersofHint (String[] hints, char[] alphabet){
 
-		for (int i = 0; i < hints.length; i++) {
-			String hintList = hints[i]; // ABCDEFG
-			char[] stringToCharArray = hintList.toCharArray();
-			for (int j = 0; j < stringToCharArray.length; j++) {
-				char hintChar = stringToCharArray[j]; // A
-				for (int k = 0; k < alphabet.length; k++) {
-					if (hintChar == alphabet[k] && !hintchars.contains(hintChar)) {
-						hintchars.add(hintChar);
-					}
-				}
-			}
-			//System.out.println("Hint List*: " + hintList);
-		}
-
-
-		Iterator<Character> itr = hintchars.iterator();
-		while (itr.hasNext()) {
-			char element = itr.next();
-			//System.out.println("element: " + element);
-			for (int m = 0; m < alphabet.length; m++) {
-				if (element == alphabet[m]) {
-					alphabet[m] = 0;
-				}
-			}
-		}
-
-		List<Character> hintcharsFound = new ArrayList<Character>();
-		for (int n = 0; n < alphabet.length; n++) {
-			if (alphabet[n] != 0) { //Problem doesnt go in
-				hintcharsFound.add(alphabet[n]);
-				//System.out.println("hintcharsFound size*: " + hintcharsFound.size());
-			}
-		}
-
+		char[] hintcharsFound = {'A'};
 		return hintcharsFound;
 	}
 
-	public void possibleStrings(int maxLength, Character[] alphabet, String curr, String encrypted) {
+	// Generating all possible strings of length k
+	// strings are hashed
+	// https://www.geeksforgeeks.org/print-all-combinations-of-given-length/
+
+	 void printAllKLengthRec(char[] set, String prefix, int n, int k, String encrypted)
+	{
 		String password = encrypted;
 
-
-		if(curr.length() == maxLength) {
-			String curr_hashed = hash(curr);
+		// Base case: k is 0,
+		// print prefix
+		if (k == 0)
+		{
+			String curr_hashed = hash(prefix);
 			if (curr_hashed.equals(password)){
 				System.out.println("***Password found!");
-				this.decryptedPassword = curr;
+				this.decryptedPassword = prefix;
 
-			}
+			}			return;
+		}
 
-			// Else add each letter from the alphabet to new strings and process these new strings again
-		} else {
-			for(int i = 0; i < alphabet.length; i++) {
-				String oldCurr = curr;
-				curr += alphabet[i];
-				possibleStrings(maxLength,alphabet,curr, encrypted);
-				curr = oldCurr;
-			}
+		// One by one add all characters
+		// from set and recursively
+		// call for k equals to k-1
+		for (int i = 0; i < n; ++i)
+		{
+
+			// Next character of input added
+			String newPrefix = prefix + set[i];
+
+			// k is decreased, because
+			// we have added a new character
+			printAllKLengthRec(set, newPrefix,
+					n, k - 1, encrypted);
 		}
 	}
 
-	
+
 	private String hash(String line) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
 			byte[] hashedBytes = digest.digest(String.valueOf(line).getBytes("UTF-8"));
-			
+
 			StringBuffer stringBuffer = new StringBuffer();
 			for (int i = 0; i < hashedBytes.length; i++) {
 				stringBuffer.append(Integer.toString((hashedBytes[i] & 0xff) + 0x100, 16).substring(1));
@@ -285,7 +247,7 @@ public class Worker extends AbstractLoggingActor {
 			throw new RuntimeException(e.getMessage());
 		}
 	}
-	
+
 	// Generating all permutations of an array using Heap's Algorithm
 	// https://en.wikipedia.org/wiki/Heap's_algorithm
 	// https://www.geeksforgeeks.org/heaps-algorithm-for-generating-permutations/
